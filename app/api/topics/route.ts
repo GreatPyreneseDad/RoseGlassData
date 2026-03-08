@@ -4,7 +4,9 @@ import { Pool } from "pg";
 export async function GET() {
   const db = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL ? "no-verify" : false,
+    ssl: process.env.DATABASE_URL
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : false,
   });
   try {
     const result = await db.query(`
