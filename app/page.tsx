@@ -23,7 +23,224 @@ function weekAgoString() {
   return d.toISOString().split("T")[0];
 }
 
+function EntryGate({ onEnter }: { onEnter: () => void }) {
+  return (
+    <div className="entry-gate">
+      <div className="entry-inner">
+        <div className="entry-emblem">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="22" stroke="#c8a96e" strokeWidth="1.5" opacity="0.6" />
+            <circle cx="24" cy="24" r="14" stroke="#c8a96e" strokeWidth="1" opacity="0.4" />
+            <circle cx="24" cy="24" r="4" fill="#c8a96e" opacity="0.8" />
+            <line x1="24" y1="2" x2="24" y2="10" stroke="#c8a96e" strokeWidth="1.5" opacity="0.6" />
+            <line x1="24" y1="38" x2="24" y2="46" stroke="#c8a96e" strokeWidth="1.5" opacity="0.6" />
+            <line x1="2" y1="24" x2="10" y2="24" stroke="#c8a96e" strokeWidth="1.5" opacity="0.6" />
+            <line x1="38" y1="24" x2="46" y2="24" stroke="#c8a96e" strokeWidth="1.5" opacity="0.6" />
+          </svg>
+        </div>
+
+        <h1 className="entry-title">Rose Glass</h1>
+        <p className="entry-subtitle">Dimensional News Analysis</p>
+
+        <div className="entry-divider" />
+
+        <div className="entry-body">
+          <p>
+            The same event, seen through a hundred lenses, tells a hundred truths.
+            Rose Glass doesn&apos;t judge which source is right —
+            it <em>translates</em> how each one sees.
+          </p>
+          <p>
+            Every article is scored across six dimensions drawn from the Rose Glass framework:
+            internal consistency, accumulated wisdom, moral activation, social belonging,
+            temporal depth, and lens interference. Together they reveal not bias, but <em>emphasis</em>.
+          </p>
+          <p>
+            Pick a topic. Pick a date. Watch the world tell itself differently.
+          </p>
+        </div>
+
+        <div className="entry-dimensions">
+          {[
+            { sym: "Ψ", label: "Consistency" },
+            { sym: "ρ", label: "Wisdom" },
+            { sym: "q", label: "Activation" },
+            { sym: "f", label: "Belonging" },
+            { sym: "τ", label: "Temporal" },
+            { sym: "λ", label: "Interference" },
+          ].map((d) => (
+            <div key={d.sym} className="entry-dim">
+              <span className="entry-dim-sym">{d.sym}</span>
+              <span className="entry-dim-label">{d.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <button className="entry-btn" onClick={onEnter}>
+          Enter the Observatory
+          <span className="entry-btn-arrow">→</span>
+        </button>
+
+        <p className="entry-footnote">
+          Powered by GDELT · Rose Glass v2 · IPAI Engine
+        </p>
+      </div>
+
+      <style>{`
+        .entry-gate {
+          min-height: 100vh;
+          background: #080c14;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+          position: relative;
+          overflow: hidden;
+        }
+        .entry-gate::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(200,169,110,0.08) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 40% at 80% 80%, rgba(41,65,110,0.15) 0%, transparent 50%);
+          pointer-events: none;
+        }
+        .entry-gate::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(200,169,110,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(200,169,110,0.03) 1px, transparent 1px);
+          background-size: 60px 60px;
+          pointer-events: none;
+        }
+        .entry-inner {
+          position: relative;
+          z-index: 1;
+          max-width: 560px;
+          width: 100%;
+          text-align: center;
+          animation: fadeUp 0.8s ease forwards;
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .entry-emblem {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 1.5rem;
+          animation: spinSlow 20s linear infinite;
+        }
+        @keyframes spinSlow {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .entry-title {
+          font-family: 'Georgia', 'Times New Roman', serif;
+          font-size: 3rem;
+          font-weight: 400;
+          letter-spacing: 0.12em;
+          color: #e8d9b8;
+          margin: 0 0 0.25rem;
+          text-transform: uppercase;
+        }
+        .entry-subtitle {
+          font-family: 'Georgia', serif;
+          font-size: 0.75rem;
+          letter-spacing: 0.35em;
+          color: #c8a96e;
+          text-transform: uppercase;
+          margin: 0 0 2rem;
+          opacity: 0.8;
+        }
+        .entry-divider {
+          width: 60px;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, #c8a96e, transparent);
+          margin: 0 auto 2rem;
+        }
+        .entry-body {
+          text-align: left;
+          margin-bottom: 2rem;
+        }
+        .entry-body p {
+          font-family: 'Georgia', serif;
+          font-size: 0.95rem;
+          line-height: 1.8;
+          color: #9aa3b5;
+          margin: 0 0 1rem;
+        }
+        .entry-body em {
+          color: #c8a96e;
+          font-style: italic;
+        }
+        .entry-dimensions {
+          display: flex;
+          justify-content: center;
+          gap: 1.5rem;
+          margin-bottom: 2.5rem;
+          flex-wrap: wrap;
+        }
+        .entry-dim {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.25rem;
+        }
+        .entry-dim-sym {
+          font-family: 'Georgia', serif;
+          font-size: 1.25rem;
+          color: #c8a96e;
+          opacity: 0.9;
+        }
+        .entry-dim-label {
+          font-size: 0.6rem;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          color: #4a5568;
+        }
+        .entry-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.875rem 2.5rem;
+          background: transparent;
+          border: 1px solid #c8a96e;
+          color: #c8a96e;
+          font-family: 'Georgia', serif;
+          font-size: 0.875rem;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin-bottom: 2rem;
+        }
+        .entry-btn:hover {
+          background: rgba(200,169,110,0.08);
+          box-shadow: 0 0 30px rgba(200,169,110,0.15);
+        }
+        .entry-btn-arrow {
+          transition: transform 0.3s ease;
+        }
+        .entry-btn:hover .entry-btn-arrow {
+          transform: translateX(4px);
+        }
+        .entry-footnote {
+          font-size: 0.65rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: #2d3748;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function Home() {
+  const [entered, setEntered] = useState(false);
   const [tab, setTab] = useState<Tab>("snapshot");
   const [topic, setTopic] = useState("");
   const [date, setDate] = useState(todayString());
@@ -34,7 +251,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
 
-  // View toggles
   const [snapshotView, setSnapshotView] = useState<SnapshotView>("cards");
   const [timelineView, setTimelineView] = useState<TimelineView>("chart");
 
@@ -67,7 +283,6 @@ export default function Home() {
     setSnapshotData(null);
     setAnalysisId(null);
 
-    // Stage timer — if still loading after 3s, assume live fetch
     const stageTimer = setTimeout(() => setLoadingStage("fetching"), 3000);
     const scoreTimer = setTimeout(() => setLoadingStage("scoring"), 20000);
 
@@ -100,6 +315,7 @@ export default function Home() {
   async function handleTimeline() {
     if (!topic.trim()) return;
     setLoading(true);
+    setLoadingStage("checking");
     setError(null);
     setTimelineData([]);
     setTimelineMeta(null);
@@ -128,116 +344,370 @@ export default function Home() {
     tab === "snapshot" ? handleSnapshot() : handleTimeline();
   }
 
+  if (!entered) return <EntryGate onEnter={() => setEntered(true)} />;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-teal-500" />
-            <h1 className="text-lg font-semibold tracking-tight">Rose Glass News</h1>
+    <div className="obs-shell">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+        .obs-shell {
+          min-height: 100vh;
+          background: #080c14;
+          color: #c8c8d0;
+          position: relative;
+        }
+        .obs-shell::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(200,169,110,0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(200,169,110,0.025) 1px, transparent 1px);
+          background-size: 60px 60px;
+          pointer-events: none;
+          z-index: 0;
+        }
+        .obs-header {
+          position: relative;
+          z-index: 1;
+          border-bottom: 1px solid rgba(200,169,110,0.12);
+          background: rgba(8,12,20,0.95);
+          backdrop-filter: blur(8px);
+        }
+        .obs-header-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 1.25rem 2rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .obs-logo {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          cursor: pointer;
+        }
+        .obs-logo-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #c8a96e;
+          box-shadow: 0 0 8px rgba(200,169,110,0.6);
+          animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+        .obs-logo-name {
+          font-family: 'EB Garamond', Georgia, serif;
+          font-size: 1.2rem;
+          font-weight: 400;
+          letter-spacing: 0.1em;
+          color: #e8d9b8;
+          text-transform: uppercase;
+        }
+        .obs-logo-sub {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.6rem;
+          color: #c8a96e;
+          letter-spacing: 0.25em;
+          text-transform: uppercase;
+          opacity: 0.7;
+        }
+        .obs-main {
+          position: relative;
+          z-index: 1;
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 2.5rem 2rem;
+        }
+
+        /* Tabs */
+        .obs-tabs {
+          display: flex;
+          gap: 0;
+          border: 1px solid rgba(200,169,110,0.15);
+          width: fit-content;
+          margin-bottom: 2rem;
+        }
+        .obs-tab {
+          padding: 0.6rem 1.5rem;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.7rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+          background: transparent;
+          color: #4a5568;
+        }
+        .obs-tab.active {
+          background: rgba(200,169,110,0.1);
+          color: #c8a96e;
+        }
+        .obs-tab:hover:not(.active) {
+          color: #7a8494;
+          background: rgba(255,255,255,0.02);
+        }
+
+        /* Search row */
+        .obs-search-row {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-end;
+          flex-wrap: wrap;
+          margin-bottom: 1.5rem;
+        }
+        .obs-field {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+        .obs-field.grow { flex: 1; min-width: 220px; }
+        .obs-label {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.6rem;
+          letter-spacing: 0.25em;
+          text-transform: uppercase;
+          color: #4a5568;
+        }
+        .obs-input {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(200,169,110,0.15);
+          color: #e8d9b8;
+          padding: 0.7rem 1rem;
+          font-family: 'EB Garamond', Georgia, serif;
+          font-size: 1rem;
+          outline: none;
+          transition: border-color 0.2s;
+          width: 100%;
+        }
+        .obs-input::placeholder {
+          color: #2d3748;
+          font-style: italic;
+        }
+        .obs-input:focus {
+          border-color: rgba(200,169,110,0.4);
+          background: rgba(200,169,110,0.03);
+        }
+        .obs-input[type="date"] {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.8rem;
+          color: #9aa3b5;
+        }
+        .obs-btn {
+          padding: 0.7rem 2rem;
+          background: transparent;
+          border: 1px solid #c8a96e;
+          color: #c8a96e;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.7rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+        .obs-btn:hover:not(:disabled) {
+          background: rgba(200,169,110,0.08);
+          box-shadow: 0 0 20px rgba(200,169,110,0.1);
+        }
+        .obs-btn:disabled {
+          border-color: #2d3748;
+          color: #2d3748;
+          cursor: not-allowed;
+        }
+
+        /* Loading */
+        .obs-loading {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem 0;
+        }
+        .obs-spinner {
+          width: 16px;
+          height: 16px;
+          border: 1px solid rgba(200,169,110,0.2);
+          border-top-color: #c8a96e;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .obs-loading-text {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.7rem;
+          letter-spacing: 0.15em;
+          color: #c8a96e;
+          opacity: 0.8;
+        }
+
+        /* Error */
+        .obs-error {
+          border: 1px solid rgba(180,60,60,0.3);
+          background: rgba(180,60,60,0.05);
+          padding: 1rem 1.25rem;
+          font-family: 'EB Garamond', Georgia, serif;
+          font-size: 0.9rem;
+          color: #c87070;
+          line-height: 1.6;
+        }
+
+        /* View toggles */
+        .obs-view-toggle {
+          display: flex;
+          gap: 0;
+          border: 1px solid rgba(200,169,110,0.12);
+          width: fit-content;
+          margin-bottom: 1.5rem;
+        }
+        .obs-view-btn {
+          padding: 0.4rem 1rem;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.65rem;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          cursor: pointer;
+          background: transparent;
+          border: none;
+          color: #4a5568;
+          transition: all 0.2s;
+        }
+        .obs-view-btn.active {
+          background: rgba(200,169,110,0.08);
+          color: #c8a96e;
+        }
+
+        /* Footer */
+        .obs-footer {
+          position: relative;
+          z-index: 1;
+          border-top: 1px solid rgba(200,169,110,0.08);
+          margin-top: 4rem;
+          padding: 1.5rem 2rem;
+          text-align: center;
+        }
+        .obs-footer p {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.6rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: #2d3748;
+        }
+        .obs-footer em {
+          color: #3d4a5a;
+          font-style: normal;
+        }
+      `}</style>
+
+      <header className="obs-header">
+        <div className="obs-header-inner">
+          <div className="obs-logo" onClick={() => setEntered(false)}>
+            <div className="obs-logo-dot" />
+            <div>
+              <div className="obs-logo-name">Rose Glass</div>
+              <div className="obs-logo-sub">News Observatory</div>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mt-1 ml-6">IPAI Dimensional News Analysis</p>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d3748", textTransform: "uppercase" }}>
+            Translation · Not Judgment
+          </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+      <main className="obs-main">
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-slate-900 rounded-lg p-1 w-fit">
+        <div className="obs-tabs">
           {(["snapshot", "timeline"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm rounded-md transition-colors capitalize ${
-                tab === t ? "bg-teal-600 text-white" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Story {t === "snapshot" ? "Snapshot" : "Timeline"}
+            <button key={t} onClick={() => setTab(t)} className={`obs-tab ${tab === t ? "active" : ""}`}>
+              {t === "snapshot" ? "Story Snapshot" : "Story Timeline"}
             </button>
           ))}
         </div>
 
-        {/* Search row */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-slate-500 mb-1">Topic</label>
+        {/* Search */}
+        <div className="obs-search-row">
+          <div className="obs-field grow">
+            <label className="obs-label">Topic</label>
             <input
               type="text"
+              className="obs-input"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="Country, conflict, or policy topic..."
               onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-teal-500 transition-colors"
             />
           </div>
 
           {tab === "snapshot" ? (
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 transition-colors" />
+            <div className="obs-field">
+              <label className="obs-label">Date</label>
+              <input type="date" className="obs-input" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           ) : (
             <>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Start</label>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 transition-colors" />
+              <div className="obs-field">
+                <label className="obs-label">Start</label>
+                <input type="date" className="obs-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">End</label>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 transition-colors" />
+              <div className="obs-field">
+                <label className="obs-label">End</label>
+                <input type="date" className="obs-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
             </>
           )}
 
-          <button onClick={handleAnalyze} disabled={loading || !topic.trim()}
-            className="px-6 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 disabled:text-slate-500 text-sm font-medium rounded-lg transition-colors">
-            {loading ? "Analyzing..." : "Analyze"}
-          </button>
+          <div className="obs-field">
+            <label className="obs-label">&nbsp;</label>
+            <button className="obs-btn" onClick={handleAnalyze} disabled={loading || !topic.trim()}>
+              {loading ? "Analyzing..." : "Analyze →"}
+            </button>
+          </div>
         </div>
 
-        {/* Topic browser — pre-loaded from DB */}
-        <TopicBrowser onSelect={(t) => { setTopic(t); }} />
+        {/* Topic browser */}
+        <TopicBrowser onSelect={(t) => setTopic(t)} />
 
         {/* Loading */}
         {loading && (
-          <div className="flex items-center gap-3 text-sm text-slate-400">
-            <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-            {tab === "timeline" ? "Building timeline across date range..." :
-          loadingStage === "checking" ? "Checking cache..." :
-          loadingStage === "fetching" ? "Querying GDELT for global coverage — first fetch takes ~30s..." :
-          "Running Rose Glass dimensional analysis..."}
+          <div className="obs-loading">
+            <div className="obs-spinner" />
+            <span className="obs-loading-text">
+              {tab === "timeline" ? "Building timeline across date range..." :
+                loadingStage === "checking" ? "Checking observatory cache..." :
+                loadingStage === "fetching" ? "Querying GDELT — global coverage, first fetch ~30s..." :
+                "Running Rose Glass dimensional analysis..."}
+            </span>
           </div>
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-950/50 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300">{error}</div>
-        )}
+        {error && <div className="obs-error">{error}</div>}
 
-        {/* ── Snapshot Results ── */}
+        {/* Snapshot results */}
         {tab === "snapshot" && snapshotData && (
-          <div className="space-y-6">
+          <div style={{ marginTop: "2rem" }}>
             {snapshotData.sources.length === 0 ? (
-              <div className="text-sm text-slate-500">No sources found for this topic and date.</div>
+              <div className="obs-error">No sources found for this topic and date.</div>
             ) : (
               <>
-                {/* View toggle */}
-                <div className="flex gap-1 bg-slate-900 rounded-lg p-1 w-fit">
+                <div className="obs-view-toggle">
                   {(["cards", "radar"] as SnapshotView[]).map((v) => (
-                    <button key={v} onClick={() => setSnapshotView(v)}
-                      className={`px-3 py-1.5 text-xs rounded-md transition-colors capitalize ${
-                        snapshotView === v ? "bg-teal-600 text-white" : "text-slate-400 hover:text-white"
-                      }`}>
+                    <button key={v} onClick={() => setSnapshotView(v)} className={`obs-view-btn ${snapshotView === v ? "active" : ""}`}>
                       {v === "cards" ? "Source Cards" : "Radar Overlay"}
                     </button>
                   ))}
                 </div>
 
                 {snapshotView === "cards" ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "1rem" }}>
                     {snapshotData.sources.map((source, i) => (
                       <SourceCard key={i} source={source} />
                     ))}
@@ -246,26 +716,28 @@ export default function Home() {
                   <SourceRadar sources={snapshotData.sources} />
                 )}
 
-                {Object.keys(snapshotData.divergence).length > 0 && (
-                  <DivergenceTable divergence={snapshotData.divergence} />
+                {Object.keys(snapshotData.divergence || {}).length > 0 && (
+                  <div style={{ marginTop: "2rem" }}>
+                    <DivergenceTable divergence={snapshotData.divergence} />
+                  </div>
                 )}
 
-                {analysisId && <ChatPanel analysisId={analysisId} />}
+                {analysisId && (
+                  <div style={{ marginTop: "2rem" }}>
+                    <ChatPanel analysisId={analysisId} />
+                  </div>
+                )}
               </>
             )}
           </div>
         )}
 
-        {/* ── Timeline Results ── */}
+        {/* Timeline results */}
         {tab === "timeline" && timelineData.length > 0 && (
-          <div className="space-y-6">
-            {/* View toggle */}
-            <div className="flex gap-1 bg-slate-900 rounded-lg p-1 w-fit">
+          <div style={{ marginTop: "2rem" }}>
+            <div className="obs-view-toggle">
               {(["chart", "heatmap"] as TimelineView[]).map((v) => (
-                <button key={v} onClick={() => setTimelineView(v)}
-                  className={`px-3 py-1.5 text-xs rounded-md transition-colors capitalize ${
-                    timelineView === v ? "bg-teal-600 text-white" : "text-slate-400 hover:text-white"
-                  }`}>
+                <button key={v} onClick={() => setTimelineView(v)} className={`obs-view-btn ${timelineView === v ? "active" : ""}`}>
                   {v === "chart" ? "Line Chart" : "Heatmap"}
                 </button>
               ))}
@@ -278,23 +750,24 @@ export default function Home() {
             )}
 
             {timelineMeta && (
-              <TimelineChatPanel
-                topic={timelineMeta.topic}
-                startDate={timelineMeta.startDate}
-                endDate={timelineMeta.endDate}
-                timeline={timelineData}
-              />
+              <div style={{ marginTop: "2rem" }}>
+                <TimelineChatPanel
+                  topic={timelineMeta.topic}
+                  startDate={timelineMeta.startDate}
+                  endDate={timelineMeta.endDate}
+                  timeline={timelineData}
+                />
+              </div>
             )}
           </div>
         )}
       </main>
 
-      <footer className="border-t border-slate-800 mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <p className="text-xs text-slate-600">
-            Rose Glass translates dimensional emphasis — it does not judge. No source is ranked better or worse.
-          </p>
-        </div>
+      <footer className="obs-footer">
+        <p>
+          Rose Glass translates dimensional emphasis — it does not judge. &nbsp;
+          <em>No source is ranked better or worse.</em>
+        </p>
       </footer>
     </div>
   );
