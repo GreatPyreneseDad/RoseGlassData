@@ -1,24 +1,30 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Server-side client — uses service role, bypasses RLS for writes
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false },
-});
-
-// Keep pool export for any routes still using raw pg locally
 import { Pool } from "pg";
-export const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news",
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+
+function getPool() {
+  return new Pool({
+    connectionString:
+      process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news",
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
+}
+
+let _pool: Pool | null = null;
+export function getDB() {
+  if (!_pool) _pool = getPool();
+  return _pool;
+}
+
+// Legacy export for routes that import pool directly
+export const pool = new Proxy({} as Pool, {
+  get(_, prop) {
+    return (getDB() as any)[prop];
+  },
 });
 
-export async function initDB() {
-  // No-op when using Supabase client — schema managed via migrations
-}
+export async function initDB() {}
 
 interface SourceInput {
   source_name: string;
@@ -32,12 +38,7 @@ interface SourceInput {
 }
 
 interface DivergenceInput {
-  [dim: string]: {
-    label: string;
-    mean: number;
-    std_dev: number;
-    variance: number;
-  };
+  [dim: string]: { label: string; mean: number; std_dev: number; variance: number };
 }
 
 export async function saveAnalysis(
@@ -46,140 +47,98 @@ export async function saveAnalysis(
   sources: SourceInput[],
   divergence: DivergenceInput
 ): Promise<string> {
-  // Upsert analysis
-  const { data: existing } = await supabase
-    .from("analyses")
-    .select("id")
-    .eq("topic", topic.toUpperCase())
-    .eq("date", date)
-    .single();
-
-  let analysisId: string;
-
-  if (existing) {
-    analysisId = existing.id;
-  } else {
-    const { data, error } = await supabase
-      .from("analyses")
-      .insert({ topic: topic.toUpperCase(), date })
-      .select("id")
-      .single();
-    if (error) throw error;
-    analysisId = data.id;
+  const db = getDB();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const ar = await client.query(
+      "INSERT INTO analyses (topic, date) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id",
+      [topic, date]
+    );
+    let analysisId: string;
+    if (ar.rows.length === 0) {
+      const ex = await client.query(
+        "SELECT id FROM analyses WHERE UPPER(topic)=UPPER($1) AND date=$2",
+        [topic, date]
+      );
+      analysisId = ex.rows[0].id;
+    } else {
+      analysisId = ar.rows[0].id;
+    }
+    for (const s of sources) {
+      await client.query(
+        `INSERT INTO sources (analysis_id,source_name,source_type,calibration,url,article_text,
+         psi,rho,q,f,tau,lambda_val,coherence,veritas_score,veritas_assessment)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        [analysisId, s.source_name, s.source_type, s.calibration,
+         s.url||null, s.article_text||null,
+         s.dimensions.psi??null, s.dimensions.rho??null, s.dimensions.q??null,
+         s.dimensions.f??null, s.dimensions.tau??null, s.dimensions.lambda??null,
+         s.coherence, s.veritas?.authenticity_score??null,
+         s.veritas?.flags?.join(", ")||null]
+      );
+    }
+    for (const [dim, info] of Object.entries(divergence)) {
+      await client.query(
+        "INSERT INTO divergence (analysis_id,dimension,mean_val,std_dev,variance) VALUES ($1,$2,$3,$4,$5)",
+        [analysisId, dim, info.mean, info.std_dev, info.variance]
+      );
+    }
+    await client.query("COMMIT");
+    return analysisId;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
   }
-
-  // Insert sources
-  const sourceRows = sources.map((s) => ({
-    analysis_id: analysisId,
-    source_name: s.source_name,
-    source_type: s.source_type,
-    calibration: s.calibration,
-    url: s.url || null,
-    article_text: s.article_text || null,
-    psi: s.dimensions.psi ?? null,
-    rho: s.dimensions.rho ?? null,
-    q: s.dimensions.q ?? null,
-    f: s.dimensions.f ?? null,
-    tau: s.dimensions.tau ?? null,
-    lambda_val: s.dimensions.lambda ?? null,
-    coherence: s.coherence,
-    veritas_score: s.veritas?.authenticity_score ?? null,
-    veritas_assessment: s.veritas?.flags?.join(", ") || null,
-  }));
-
-  const { error: srcErr } = await supabase.from("sources").insert(sourceRows);
-  if (srcErr) throw srcErr;
-
-  // Insert divergence
-  const divRows = Object.entries(divergence).map(([dim, info]) => ({
-    analysis_id: analysisId,
-    dimension: dim,
-    mean_val: info.mean,
-    std_dev: info.std_dev,
-    variance: info.variance,
-  }));
-
-  const { error: divErr } = await supabase.from("divergence").insert(divRows);
-  if (divErr) throw divErr;
-
-  return analysisId;
 }
 
 export async function getCachedAnalysis(topic: string, date: string) {
-  const { data: analysis } = await supabase
-    .from("analyses")
-    .select("id, topic, date, created_at")
-    .eq("date", date)
-    .ilike("topic", topic)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (!analysis) return null;
-
-  const { data: sources } = await supabase
-    .from("sources")
-    .select("*")
-    .eq("analysis_id", analysis.id);
-
-  const { data: divRows } = await supabase
-    .from("divergence")
-    .select("*")
-    .eq("analysis_id", analysis.id);
-
-  const divergence: Record<string, { label: string; mean: number; std_dev: number; variance: number }> = {};
-  for (const r of divRows || []) {
-    divergence[r.dimension] = {
-      label: r.dimension,
-      mean: r.mean_val,
-      std_dev: r.std_dev,
-      variance: r.variance,
-    };
+  const db = getDB();
+  const ar = await db.query(
+    "SELECT id,topic,date::text,created_at FROM analyses WHERE UPPER(topic)=UPPER($1) AND date=$2 ORDER BY created_at DESC LIMIT 1",
+    [topic, date]
+  );
+  if (!ar.rows.length) return null;
+  const a = ar.rows[0];
+  const sr = await db.query(
+    "SELECT * FROM sources WHERE analysis_id=$1", [a.id]
+  );
+  const dr = await db.query(
+    "SELECT * FROM divergence WHERE analysis_id=$1", [a.id]
+  );
+  const divergence: Record<string, any> = {};
+  for (const r of dr.rows) {
+    divergence[r.dimension] = { label: r.dimension, mean: r.mean_val, std_dev: r.std_dev, variance: r.variance };
   }
-
   return {
-    analysis_id: analysis.id,
-    topic: analysis.topic,
-    date: analysis.date,
-    sources: (sources || []).map((r) => ({
-      source_name: r.source_name,
-      source_type: r.source_type,
-      calibration: r.calibration,
-      url: r.url,
-      article_text: r.article_text,
+    analysis_id: a.id, topic: a.topic, date: a.date,
+    sources: sr.rows.map((r: any) => ({
+      source_name: r.source_name, source_type: r.source_type,
+      calibration: r.calibration, url: r.url, article_text: r.article_text,
       dimensions: { psi: r.psi, rho: r.rho, q: r.q, f: r.f, tau: r.tau, lambda: r.lambda_val },
       coherence: r.coherence,
       veritas: r.veritas_score != null
-        ? { authenticity_score: r.veritas_score, flags: r.veritas_assessment ? r.veritas_assessment.split(", ") : [] }
+        ? { authenticity_score: r.veritas_score, flags: r.veritas_assessment?.split(", ")||[] }
         : null,
     })),
-    divergence,
-    cache: true,
+    divergence, cache: true,
   };
 }
 
 export async function getRecentAnalyses(limit = 10) {
-  const { data } = await supabase
-    .from("analyses")
-    .select("id, topic, date, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return data || [];
+  const db = getDB();
+  const r = await db.query(
+    "SELECT id,topic,date::text,created_at FROM analyses ORDER BY created_at DESC LIMIT $1", [limit]
+  );
+  return r.rows;
 }
 
 export async function getAnalysisWithSources(analysisId: string) {
-  const { data: analysis } = await supabase
-    .from("analyses")
-    .select("id, topic, date")
-    .eq("id", analysisId)
-    .single();
-
-  if (!analysis) return null;
-
-  const { data: sources } = await supabase
-    .from("sources")
-    .select("*")
-    .eq("analysis_id", analysisId);
-
-  return { ...analysis, sources: sources || [] };
+  const db = getDB();
+  const ar = await db.query("SELECT id,topic,date::text FROM analyses WHERE id=$1", [analysisId]);
+  if (!ar.rows.length) return null;
+  const sr = await db.query("SELECT * FROM sources WHERE analysis_id=$1", [analysisId]);
+  return { ...ar.rows[0], sources: sr.rows };
 }
