@@ -4,7 +4,7 @@ function getPool() {
   return new Pool({
     connectionString:
       process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news",
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false, checkServerIdentity: () => undefined } : false,
+    ssl: process.env.DATABASE_URL ? "no-verify" : false,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
