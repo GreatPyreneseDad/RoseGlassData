@@ -1,28 +1,32 @@
-import { Pool } from "pg";
+import { Pool, PoolConfig } from "pg";
 
-function getPool() {
-  return new Pool({
-    connectionString:
-      process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news",
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false, checkServerIdentity: () => undefined } : false,
-    max: 5,
-    idleTimeoutMillis: 30000,
+function createPoolConfig(): PoolConfig {
+  const connectionString =
+    process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news";
+
+  const isSupabase = connectionString.includes("supabase");
+
+  return {
+    connectionString,
+    ssl: isSupabase ? { rejectUnauthorized: false } : false,
+    max: 3,
+    idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 5000,
-  });
+  };
 }
 
 let _pool: Pool | null = null;
-export function getDB() {
-  if (!_pool) _pool = getPool();
+
+export function getDB(): Pool {
+  if (!_pool) {
+    _pool = new Pool(createPoolConfig());
+    _pool.on("error", (err) => {
+      console.error("[db] Pool error:", err.message);
+      _pool = null;
+    });
+  }
   return _pool;
 }
-
-// Legacy export for routes that import pool directly
-export const pool = new Proxy({} as Pool, {
-  get(_, prop) {
-    return (getDB() as any)[prop];
-  },
-});
 
 export async function initDB() {}
 
@@ -102,12 +106,8 @@ export async function getCachedAnalysis(topic: string, date: string) {
   );
   if (!ar.rows.length) return null;
   const a = ar.rows[0];
-  const sr = await db.query(
-    "SELECT * FROM sources WHERE analysis_id=$1", [a.id]
-  );
-  const dr = await db.query(
-    "SELECT * FROM divergence WHERE analysis_id=$1", [a.id]
-  );
+  const sr = await db.query("SELECT * FROM sources WHERE analysis_id=$1", [a.id]);
+  const dr = await db.query("SELECT * FROM divergence WHERE analysis_id=$1", [a.id]);
   const divergence: Record<string, any> = {};
   for (const r of dr.rows) {
     divergence[r.dimension] = { label: r.dimension, mean: r.mean_val, std_dev: r.std_dev, variance: r.variance };

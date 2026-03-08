@@ -3,8 +3,7 @@ import { getDB } from "@/lib/db";
 
 export async function GET() {
   try {
-    const db = getDB();
-    const result = await db.query(`
+    const result = await getDB().query(`
       SELECT topic, MAX(date)::text AS latest_date, COUNT(*)::int AS count
       FROM analyses
       GROUP BY topic

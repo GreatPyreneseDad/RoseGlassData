@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { Pool } from "pg";
+import { getDB } from "@/lib/db";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news", ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false, checkServerIdentity: () => undefined } : false });
+
 
 // ─────────────────────────────────────────────────────────
 // Fetch poems from DB for topic + date range
@@ -18,7 +18,7 @@ interface PoemRow {
 
 async function fetchPoems(topic: string, startDate: string, endDate: string): Promise<PoemRow[]> {
   try {
-    const result = await pool.query<PoemRow>(
+    const result = await getDB().query<PoemRow>(
       `SELECT a.date::text, s.source_name, s.cultural_lens, s.poem,
               s.psi, s.rho, s.q, s.f, s.tau, s.lambda_val
        FROM sources s
