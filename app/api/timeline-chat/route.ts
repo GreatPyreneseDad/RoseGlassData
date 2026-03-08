@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
 import { getDB } from "@/lib/db";
 
-
-
 // ─────────────────────────────────────────────────────────
-// Fetch poems from DB for topic + date range
+// Types
 // ─────────────────────────────────────────────────────────
 
 interface PoemRow {
@@ -15,6 +13,17 @@ interface PoemRow {
   psi: number; rho: number; q: number;
   f: number; tau: number; lambda_val: number;
 }
+
+interface SourceRow {
+  source_name: string;
+  url: string;
+  article_text: string | null;
+  date: string;
+}
+
+// ─────────────────────────────────────────────────────────
+// Fetch poems
+// ─────────────────────────────────────────────────────────
 
 async function fetchPoems(topic: string, startDate: string, endDate: string): Promise<PoemRow[]> {
   try {
@@ -37,7 +46,121 @@ async function fetchPoems(topic: string, startDate: string, endDate: string): Pr
 }
 
 // ─────────────────────────────────────────────────────────
-// Build poem section grouped by date
+// Fetch source URLs + cached article text
+// ─────────────────────────────────────────────────────────
+
+async function fetchSources(topic: string, startDate: string, endDate: string): Promise<SourceRow[]> {
+  try {
+    const result = await getDB().query<SourceRow>(
+      `SELECT s.source_name, s.url, s.article_text, a.date::text
+       FROM sources s
+       JOIN analyses a ON s.analysis_id = a.id
+       WHERE UPPER(a.topic) = UPPER($1)
+         AND a.date BETWEEN $2::date AND $3::date
+         AND s.url IS NOT NULL
+       ORDER BY a.date ASC
+       LIMIT 20`,
+      [topic, startDate, endDate]
+    );
+    return result.rows;
+  } catch (err) {
+    console.warn("[timeline-chat] source fetch failed:", err);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Fetch article text from URL (with timeout)
+// ─────────────────────────────────────────────────────────
+
+async function fetchArticleText(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; RoseGlassBot/1.0)" },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return "";
+    const html = await res.text();
+    // Strip tags, collapse whitespace, truncate
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 3000);
+    return text;
+  } catch {
+    return "";
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Build source fetch section for fallback
+// ─────────────────────────────────────────────────────────
+
+async function buildSourceFallback(
+  sources: SourceRow[],
+  limit = 5
+): Promise<string> {
+  if (sources.length === 0) return "";
+
+  const results: string[] = ["RAW SOURCE TEXT (fetched from GDELT source URLs):"];
+  let fetched = 0;
+
+  for (const src of sources) {
+    if (fetched >= limit) break;
+
+    // Use cached article_text if available, otherwise fetch
+    let text = src.article_text?.trim() || "";
+    if (!text && src.url) {
+      text = await fetchArticleText(src.url);
+    }
+    if (!text) continue;
+
+    results.push(
+      `\n[${src.date} | ${src.source_name}]\nURL: ${src.url}\n${text.slice(0, 2000)}`
+    );
+    fetched++;
+  }
+
+  if (fetched === 0) return "";
+  return results.join("\n");
+}
+
+// ─────────────────────────────────────────────────────────
+// Detect whether user is asking a factual question
+// the poems didn't answer
+// ─────────────────────────────────────────────────────────
+
+function needsSourceFallback(message: string, history: Array<{ role: string; content: string }>): boolean {
+  // User is pushing for specifics the poems didn't provide
+  const specificitySignals = [
+    /how many/i,
+    /casualt/i,
+    /exact(ly)?/i,
+    /specific (number|figure|count|detail)/i,
+    /can you (search|look|find|check)/i,
+    /what (number|figure|count)/i,
+    /dead|died|deaths|killed|wounded/i,
+    /search/i,
+  ];
+
+  // Check if prior assistant turn admitted not having the answer
+  const lastAssistant = [...history].reverse().find(m => m.role === "assistant");
+  const assistantAdmittedGap = lastAssistant
+    ? /cannot find|don't have|not in (this|my)|absence|no source|didn't (see|report)/i.test(lastAssistant.content)
+    : false;
+
+  const isSpecific = specificitySignals.some(r => r.test(message));
+  return isSpecific || assistantAdmittedGap;
+}
+
+// ─────────────────────────────────────────────────────────
+// Build poem section
 // ─────────────────────────────────────────────────────────
 
 function buildPoemSection(poems: PoemRow[]): string {
@@ -64,40 +187,6 @@ function buildPoemSection(poems: PoemRow[]): string {
 }
 
 // ─────────────────────────────────────────────────────────
-// Web search fallback (fires only when no poems exist)
-// ─────────────────────────────────────────────────────────
-
-async function fetchRecentNews(topic: string, startDate: string, endDate: string, apiKey: string): Promise<string> {
-  try {
-    const searchResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{
-          role: "user",
-          content: `Search for the most significant news events about "${topic}" between ${startDate} and ${endDate}. Return a concise factual summary of key events per date. Be specific about dates. 3-5 sentences max per day that had notable events.`
-        }]
-      }),
-    });
-    if (!searchResponse.ok) return "";
-    const data = await searchResponse.json();
-    return data.content
-      ?.filter((b: { type: string }) => b.type === "text")
-      ?.map((b: { text: string }) => b.text)
-      ?.join("\n") || "";
-  } catch {
-    return "";
-  }
-}
-
-// ─────────────────────────────────────────────────────────
 // System prompt
 // ─────────────────────────────────────────────────────────
 
@@ -111,7 +200,7 @@ function buildSystemPrompt(
     coherence: number; sourceCount: number;
   }>,
   poemSection: string,
-  fallbackNews: string
+  sourceFallback: string
 ): string {
   const dimRows = timeline
     .map((d) =>
@@ -119,8 +208,8 @@ function buildSystemPrompt(
     )
     .join("\n");
 
-  const fallbackSection = fallbackNews
-    ? `\nACTUAL EVENTS (web search fallback):\n${fallbackNews}\n`
+  const sourceSection = sourceFallback
+    ? `\n${sourceFallback}\n\nNOTE: The above is raw text fetched directly from the GDELT source URLs. Use it to answer specific factual questions the poems couldn't resolve. Cite the source name and date when drawing from it. This is still bounded to the same sources — just unpoemed.\n`
     : "";
 
   return `You are Rose Glass — a translation layer between news coverage and the reader.
@@ -130,7 +219,7 @@ You do not judge sources. You translate. You carry meaning across the gap.
 You are analyzing coverage of "${topic}" from ${startDate} to ${endDate}.
 
 ${poemSection}
-${fallbackSection}
+${sourceSection}
 DIMENSIONAL SIGNAL (averaged per day — describes HOW sources covered it):
 ${dimRows}
 
@@ -142,10 +231,11 @@ ROSE GLASS DIMENSIONS:
 HOW TO USE THIS:
 - The poems carry what actually happened — actors, stakes, events, texture
 - Each poem is written from inside a detected cultural lens — read as witness accounts
+- Raw source text (when present) contains the unpoemed original — use for specific facts
 - The dimensional data describes signal characteristics — use it to explain WHY poems feel the way they do
 - When asked what happened: read across poems for that date, synthesize common facts, note lens divergence
 - When lenses diverge sharply on the same event, that divergence IS the story
-- A false positive is worse than silence — if poems don't give enough to answer, say so
+- A false positive is worse than silence — if neither poems nor source text give enough to answer, say so clearly
 
 TRANSLATION PRINCIPLES:
 - High q + low Ψ: feeling outrunning internal consistency
@@ -178,19 +268,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch poems from DB — primary content layer
+    // Primary layer: poems
     const poems = await fetchPoems(topic, startDate, endDate);
     const poemSection = buildPoemSection(poems);
 
-    // Web search fallback only if no poems AND user asking about events
-    const eventKeywords = /what happened|actual events|specific|news|report|tell me|describe|summarize/i;
-    const needsFallback = poems.length === 0 && eventKeywords.test(message) && history.length <= 2;
-    const fallbackNews = needsFallback
-      ? await fetchRecentNews(topic, startDate, endDate, apiKey)
-      : "";
+    // Secondary layer: raw source text, fetched from GDELT URLs
+    // Fires when user is asking for specifics the poems didn't answer
+    let sourceFallback = "";
+    if (needsSourceFallback(message, history || [])) {
+      const sources = await fetchSources(topic, startDate, endDate);
+      sourceFallback = await buildSourceFallback(sources, 5);
+    }
 
     const systemPrompt = buildSystemPrompt(
-      topic, startDate, endDate, timeline, poemSection, fallbackNews
+      topic, startDate, endDate, timeline, poemSection, sourceFallback
     );
 
     const messages = [
