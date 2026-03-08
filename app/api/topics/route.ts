@@ -4,7 +4,7 @@ import { Pool } from "pg";
 export async function GET() {
   const db = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.DATABASE_URL?.includes("supabase") ? { rejectUnauthorized: false, checkServerIdentity: () => undefined } : false,
   });
   try {
     const result = await db.query(`

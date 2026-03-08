@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { Pool } from "pg";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news", ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news", ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false, checkServerIdentity: () => undefined } : false });
 
 // ─────────────────────────────────────────────────────────
 // Fetch poems from DB for topic + date range
