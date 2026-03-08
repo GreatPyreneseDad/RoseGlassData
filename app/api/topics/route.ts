@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDB } from "@/lib/db";
+import { Pool } from "pg";
 
 export async function GET() {
+  const db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
   try {
-    const db = getDB();
     const result = await db.query(`
       SELECT topic, MAX(date)::text AS latest_date, COUNT(*)::int AS count
       FROM analyses
@@ -12,8 +15,10 @@ export async function GET() {
       LIMIT 30
     `);
     return NextResponse.json({ topics: result.rows });
-  } catch (err) {
-    console.error("[topics]", err);
-    return NextResponse.json({ topics: [] });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ topics: [], error: msg }, { status: 500 });
+  } finally {
+    await db.end();
   }
 }
