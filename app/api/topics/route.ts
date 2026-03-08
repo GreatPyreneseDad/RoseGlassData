@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { initDB } from "@/lib/db";
 import { Pool } from "pg";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news", ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false });
-
 export async function GET() {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || "postgresql://localhost/rose_glass_news",
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  });
   try {
-    await initDB();
     const result = await pool.query(`
       SELECT
         topic,
@@ -18,8 +18,11 @@ export async function GET() {
       LIMIT 30
     `);
     return NextResponse.json({ topics: result.rows });
-  } catch (err) {
-    console.error("[topics]", err);
-    return NextResponse.json({ topics: [] });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[topics error]", msg);
+    return NextResponse.json({ topics: [], error: msg }, { status: 500 });
+  } finally {
+    await pool.end();
   }
 }
