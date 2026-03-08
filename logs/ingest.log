@@ -1,0 +1,43 @@
+[2026-03-07 06:00:01] Starting daily ingest
+
+Rose Glass Daily Ingest — 2026-03-07
+Topics: ['IRAN', 'UKRAINE', 'CLIMATE', 'ELECTION', 'ECONOMY', 'CHINA', 'ISRAEL', 'FEDERAL RESERVE', 'AI', 'NATO', 'NIGERIA', 'BRAZIL', 'AUSTRALIA', 'INDIA', 'MEXICO']
+--------------------------------------------------
+  [discover] failed: 400 GET https://bigquery.googleapis.com/bigquery/v2/projects/project-cbd5d6c3-e99a-41b4-bf5/queries/a05d2956-d9a7-458d-841d-d82df6f02974?maxResults=0&location=US&prettyPrint=false: Failed to parse input string "20251202161500000000"
+
+Location: US
+Job ID: a05d2956-d9a7-458d-841d-d82df6f02974
+
+Extended topics: ['IRAN', 'UKRAINE', 'CLIMATE', 'ELECTION', 'ECONOMY', 'CHINA', 'ISRAEL', 'FEDERAL RESERVE', 'AI', 'NATO', 'NIGERIA', 'BRAZIL', 'AUSTRALIA', 'INDIA', 'MEXICO']
+  [cached] IRAN 2026-03-07
+  [fetch]  UKRAINE 2026-03-07...
+  [empty]  UKRAINE 2026-03-07 — no sources
+  [fetch]  CLIMATE 2026-03-07...
+  [saved]  CLIMATE 2026-03-07 → e7fc13c9-b476-4ec0-bcf7-0f66a7da3f2d (5 sources)
+  [fetch]  ELECTION 2026-03-07...
+  [saved]  ELECTION 2026-03-07 → 148df2dc-1625-4e2c-9628-d0938abf3f0c (5 sources)
+  [fetch]  ECONOMY 2026-03-07...
+  [saved]  ECONOMY 2026-03-07 → edfba44e-2cdf-4b43-bddb-7dad1793229d (5 sources)
+  [cached] CHINA 2026-03-07
+  [fetch]  ISRAEL 2026-03-07...
+  [empty]  ISRAEL 2026-03-07 — no sources
+  [fetch]  FEDERAL RESERVE 2026-03-07...
+  [empty]  FEDERAL RESERVE 2026-03-07 — no sources
+  [fetch]  AI 2026-03-07...
+  [saved]  AI 2026-03-07 → 6a0a1492-e16e-45eb-98ac-df9b62f8a4ac (5 sources)
+  [fetch]  NATO 2026-03-07...
+  [saved]  NATO 2026-03-07 → 7df8075d-96d1-4a47-aa3c-07be47e0b402 (5 sources)
+  [fetch]  NIGERIA 2026-03-07...
+  [saved]  NIGERIA 2026-03-07 → f0646ae3-faf0-4c31-82ef-061e752c4a01 (3 sources)
+  [fetch]  BRAZIL 2026-03-07...
+  [empty]  BRAZIL 2026-03-07 — no sources
+  [fetch]  AUSTRALIA 2026-03-07...
+  [saved]  AUSTRALIA 2026-03-07 → 74737ca4-fd41-4930-b94e-5a3ec4604a2f (4 sources)
+  [fetch]  INDIA 2026-03-07...
+  [saved]  INDIA 2026-03-07 → 3708414c-a662-456d-9acc-1df41ab24952 (5 sources)
+  [fetch]  MEXICO 2026-03-07...
+  [empty]  MEXICO 2026-03-07 — no sources
+--------------------------------------------------
+Done: 8 saved, 7 skipped/cached
+Completed at 06:19:37
+[2026-03-07 06:19:37] Ingest complete

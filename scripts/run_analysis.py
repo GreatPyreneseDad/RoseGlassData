@@ -56,7 +56,7 @@ def fetch_article_text(url: str) -> str:
         html = re.sub(r"<style[^>]*>.*?</style>", " ", html, flags=re.DOTALL | re.IGNORECASE)
         text = _TAG_RE.sub(" ", html)
         text = _WHITESPACE_RE.sub(" ", text).strip()
-        return text[:1000]
+        return text[:5000]
     except Exception:
         return ""
 
@@ -92,6 +92,7 @@ def run_analysis(topic: str, date_str: str, limit: int = 10) -> dict:
             "source_name": f"{article['source']} ({domain})",
             "source_type": source_type,
             "text": text,
+            "url": article["url"],
             "v2tone": article["v2tone"],
         })
 
@@ -102,14 +103,20 @@ def run_analysis(topic: str, date_str: str, limit: int = 10) -> dict:
     engine = RoseGlassEngine()
     comparison = compare_sources(sources, engine)
 
+    # Build a lookup from source_name to the original source dict
+    source_lookup = {s["source_name"]: s for s in sources}
+
     # Serialize results
     output_sources = []
     for r in comparison["results"]:
         score = r["score"]
+        orig = source_lookup.get(r["source_name"], {})
         source_data = {
             "source_name": r["source_name"],
             "source_type": r["source_type"],
             "calibration": r["calibration"],
+            "url": orig.get("url", ""),
+            "article_text": orig.get("text", ""),
             "dimensions": {
                 "psi": score.psi,
                 "rho": score.rho,
