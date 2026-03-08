@@ -30,6 +30,7 @@ export default function Home() {
   const [startDate, setStartDate] = useState(weekAgoString());
   const [endDate, setEndDate] = useState(todayString());
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<"checking" | "fetching" | "scoring">("checking");
   const [error, setError] = useState<string | null>(null);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
 
@@ -61,9 +62,14 @@ export default function Home() {
   async function handleSnapshot() {
     if (!topic.trim()) return;
     setLoading(true);
+    setLoadingStage("checking");
     setError(null);
     setSnapshotData(null);
     setAnalysisId(null);
+
+    // Stage timer — if still loading after 3s, assume live fetch
+    const stageTimer = setTimeout(() => setLoadingStage("fetching"), 3000);
+    const scoreTimer = setTimeout(() => setLoadingStage("scoring"), 20000);
 
     try {
       const res = await fetch("/api/analyze", {
@@ -71,13 +77,22 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic: topic.trim().toUpperCase(), date }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json();
+        const msg = errData.error || `HTTP ${res.status}`;
+        if (res.status === 404 || msg.includes("No articles")) {
+          throw new Error("No international coverage found for this topic on this date. Rose Glass runs on GDELT, which indexes global news sources. Try a geopolitical topic (country, conflict, policy) or a different date.");
+        }
+        throw new Error(msg);
+      }
       const data = await res.json();
       setSnapshotData(data);
       if (data.analysis_id) setAnalysisId(data.analysis_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
+      clearTimeout(stageTimer);
+      clearTimeout(scoreTimer);
       setLoading(false);
     }
   }
@@ -150,7 +165,7 @@ export default function Home() {
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="IRAN, CLIMATE, ELECTION..."
+              placeholder="Country, conflict, or policy topic..."
               onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-teal-500 transition-colors"
             />
@@ -190,7 +205,10 @@ export default function Home() {
         {loading && (
           <div className="flex items-center gap-3 text-sm text-slate-400">
             <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-            {tab === "snapshot" ? "Querying GDELT and running Rose Glass analysis..." : "Building timeline across date range..."}
+            {tab === "timeline" ? "Building timeline across date range..." :
+          loadingStage === "checking" ? "Checking cache..." :
+          loadingStage === "fetching" ? "Querying GDELT for global coverage — first fetch takes ~30s..." :
+          "Running Rose Glass dimensional analysis..."}
           </div>
         )}
 
