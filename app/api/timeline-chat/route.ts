@@ -39,10 +39,12 @@ async function fetchPoems(topic: string, startDate: string, endDate: string): Pr
 }
 
 // ─────────────────────────────────────────────────────────
-// Web search — fires when poems can't answer the question
+// Web search — factual grounding layer
+// Runs on every call to anchor Claude's responses in
+// verifiable facts, preventing confabulation from poems alone
 // ─────────────────────────────────────────────────────────
 
-async function webSearch(
+async function fetchFactualContext(
   topic: string,
   startDate: string,
   endDate: string,
@@ -59,12 +61,12 @@ async function webSearch(
         "anthropic-beta": "web-search-2025-03-05",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{
           role: "user",
-          content: `Search for factual information to answer this question about "${topic}" during ${startDate} to ${endDate}: "${userQuestion}". Return only concrete facts with dates and numbers where available. Be brief and specific.`
+          content: `Search for key facts about "${topic}" between ${startDate} and ${endDate}. Focus on: specific events, casualties, named actors, confirmed figures, major developments. The user is asking: "${userQuestion}". Return only concrete verifiable facts — dates, numbers, names, confirmed events. Be brief and specific. No analysis.`
         }]
       }),
     });
@@ -84,36 +86,6 @@ async function webSearch(
 }
 
 // ─────────────────────────────────────────────────────────
-// Detect whether user needs factual context beyond poems
-// ─────────────────────────────────────────────────────────
-
-function needsWebSearch(
-  message: string,
-  history: Array<{ role: string; content: string }>
-): boolean {
-  const factualSignals = [
-    /how many/i,
-    /casualt/i,
-    /how (much|long|far|often)/i,
-    /exact(ly)?/i,
-    /specific (number|figure|count|detail)/i,
-    /can you (search|look|find|check)/i,
-    /search/i,
-    /\bnumber\b/i,
-    /dead|died|deaths|killed|wounded/i,
-    /what (happened|was the|were the)/i,
-  ];
-
-  // If the prior assistant response admitted not knowing — search
-  const lastAssistant = [...history].reverse().find(m => m.role === "assistant");
-  const priorGap = lastAssistant
-    ? /cannot find|don't have|not in (this|my)|absence|no source|didn't (see|report)|cannot provide/i.test(lastAssistant.content)
-    : false;
-
-  return factualSignals.some(r => r.test(message)) || priorGap;
-}
-
-// ─────────────────────────────────────────────────────────
 // Build poem section
 // ─────────────────────────────────────────────────────────
 
@@ -126,7 +98,7 @@ function buildPoemSection(poems: PoemRow[]): string {
     byDate[p.date].push(p);
   }
 
-  const lines: string[] = ["WITNESS POEMS (what sources saw, through their lens):"];
+  const lines: string[] = ["WITNESS POEMS (lens through which sources saw events):"];
   for (const date of Object.keys(byDate).sort()) {
     lines.push(`\n${date}:`);
     for (const p of byDate[date]) {
@@ -154,7 +126,7 @@ function buildSystemPrompt(
     coherence: number; sourceCount: number;
   }>,
   poemSection: string,
-  searchContext: string
+  factualContext: string
 ): string {
   const dimRows = timeline
     .map((d) =>
@@ -162,19 +134,23 @@ function buildSystemPrompt(
     )
     .join("\n");
 
-  const searchSection = searchContext
-    ? `\nWEB SEARCH CONTEXT (retrieved to answer a specific factual question):\n${searchContext}\n\nUse this to fill factual gaps the witness poems couldn't resolve. Cite it as general context, not as a poem source.\n`
+  const factualSection = factualContext
+    ? `\nVERIFIED FACTUAL CONTEXT (web search — use this as ground truth):\n${factualContext}\n`
     : "";
 
   return `You are Rose Glass — a translation layer between news coverage and the reader.
 
-You do not judge sources. You translate. You carry meaning across the gap.
+You have two layers of information. Use them together:
 
-You are analyzing coverage of "${topic}" from ${startDate} to ${endDate}.
+1. FACTUAL LAYER — verified facts from web search. This is ground truth. Never contradict it.
+2. LENS LAYER — witness poems showing HOW sources framed those facts through cultural lenses.
 
+The poems compress the lens, not the facts. Do not derive factual claims from poems alone.
+If a fact isn't in the factual layer, say you don't have it — do not construct it from poem imagery.
+${factualSection}
 ${poemSection}
-${searchSection}
-DIMENSIONAL SIGNAL (averaged per day — describes HOW sources covered it):
+
+DIMENSIONAL SIGNAL (how sources covered it, averaged per day):
 ${dimRows}
 
 ROSE GLASS DIMENSIONS:
@@ -182,17 +158,12 @@ ROSE GLASS DIMENSIONS:
   q = emotional activation   f = social/tribal framing
   τ = temporal depth         λ = lens interference
 
-HOW TO USE THIS:
-- The poems carry what sources witnessed — actors, stakes, events, texture, cultural lens
-- Web search context (when present) fills factual gaps — use it plainly, without poetic framing
-- Dimensional data describes HOW sources covered the story, not what happened
-- When lenses diverge sharply on the same event, that divergence IS the story
-- A false positive is worse than silence — if nothing gives enough to answer, say so
-
-TRANSLATION PRINCIPLES:
-- High q + low Ψ: feeling outrunning internal consistency
-- High f + low τ: tribal framing without historical depth — reactive
-- High λ: cultural interpretation gap is itself significant`;
+TRANSLATION PROTOCOL:
+- Facts come from the factual layer. Lens comes from the poems.
+- Use dimensional data to explain WHY lenses frame facts the way they do.
+- When lenses diverge on the same verified fact, that divergence IS the story.
+- High λ = cultural interpretation gap is itself significant information.
+- False positive is worse than silence. If you don't have it, say so.`;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -219,18 +190,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Primary layer: poems
-    const poems = await fetchPoems(topic, startDate, endDate);
+    // Run poems + web search in parallel
+    const [poems, factualContext] = await Promise.all([
+      fetchPoems(topic, startDate, endDate),
+      fetchFactualContext(topic, startDate, endDate, message, apiKey),
+    ]);
+
     const poemSection = buildPoemSection(poems);
-
-    // Secondary layer: web search when poems can't answer
-    let searchContext = "";
-    if (needsWebSearch(message, history || [])) {
-      searchContext = await webSearch(topic, startDate, endDate, message, apiKey);
-    }
-
     const systemPrompt = buildSystemPrompt(
-      topic, startDate, endDate, timeline, poemSection, searchContext
+      topic, startDate, endDate, timeline, poemSection, factualContext
     );
 
     const messages = [
