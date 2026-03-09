@@ -1,8 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
+import { SampleResult } from "../sample/route";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Keyword → Census topic mapping for live data injection
+const TOPIC_TRIGGERS: Array<{ patterns: RegExp[]; topic: string }> = [
+  { patterns: [/youth.*(disconnect|not.*(work|school)|neither)/i, /disconnected youth/i], topic: "youth_disconnected" },
+  { patterns: [/poverty rate/i, /below poverty/i, /poor(est)? (county|area|place)/i], topic: "poverty_rate" },
+  { patterns: [/median income/i, /household income/i, /richest.*(county|area)/i], topic: "median_income" },
+  { patterns: [/wage gap/i, /earnings.*sex/i, /women.*earn/i, /gender.*pay/i], topic: "earnings_sex" },
+  { patterns: [/commute/i, /travel time.*work/i, /transit.*work/i], topic: "commute_time" },
+  { patterns: [/foreign.?born/i, /immigrant population/i, /immigration/i], topic: "foreign_born" },
+  { patterns: [/language.*isolat/i, /linguistically/i, /english.*ability/i], topic: "language_isolation" },
+  { patterns: [/housing.*(burden|cost)/i, /rent.*income/i, /cost.burden/i], topic: "housing_cost_burden" },
+];
+
+function detectTopic(message: string): string | null {
+  for (const { patterns, topic } of TOPIC_TRIGGERS) {
+    if (patterns.some(p => p.test(message))) return topic;
+  }
+  return null;
+}
+
+async function fetchSample(
+  dataset_id: string,
+  vintage: number,
+  topic: string
+): Promise<SampleResult | null> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/sample`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataset_id, vintage, topic }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +78,14 @@ export async function POST(request: NextRequest) {
       [session_id]
     );
 
-    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows);
+    // Detect if this question can be grounded with actual data
+    const detectedTopic = detectTopic(message);
+    let sampleData: SampleResult | null = null;
+    if (detectedTopic) {
+      sampleData = await fetchSample(session.dataset_id, session.vintage, detectedTopic);
+    }
+
+    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData);
 
     await db.query(
       `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
@@ -77,7 +123,8 @@ export async function POST(request: NextRequest) {
 
 function buildSystemPrompt(
   session: Record<string, unknown>,
-  concepts: Array<{ concept: string; count: string; moe_count: string }>
+  concepts: Array<{ concept: string; count: string; moe_count: string }>,
+  sampleData: SampleResult | null
 ): string {
   const absences = (session.absences as Array<{ domain: string; absence: string; significance: string }>) || [];
   const topConcepts = concepts.slice(0, 20)
@@ -94,6 +141,25 @@ function buildSystemPrompt(
   const lambda = Number(session.lambda) || 0.5;
   const moe = Number(session.moe_coverage) || 0;
 
+  let dataSection = "";
+  if (sampleData) {
+    const rowSummary = sampleData.rows.slice(0, 20).map(r => {
+      const name = r["NAME"] || r["state"] || r["county"] || "?";
+      const vals = sampleData.variables
+        .map(v => `${v}: ${r[v] ?? "N/A"}`)
+        .join(", ");
+      return `  ${name}: ${vals}`;
+    }).join("\n");
+
+    dataSection = `
+LIVE DATA — USE THESE ACTUAL VALUES IN YOUR RESPONSE:
+Query: ${sampleData.query_description}
+${sampleData.note ? `Note: ${sampleData.note}` : ""}
+${rowSummary}
+
+These are real numbers from the Census API for this dataset. Cite them specifically. Do not approximate or generalize when you have actual figures.`;
+  }
+
   return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
 
 DATASET: ${session.name}
@@ -109,7 +175,7 @@ ${absenceList}
 
 HOW IT WAS BUILT:
 ${session.lens_summary}
-
+${dataSection}
 YOUR READING POSTURE — internalize, never quote:
 ${psi > 0.7 ? "- The framework is internally coherent. Cross-references between concepts are reliable." : "- The framework has internal gaps. Variables don't always connect as cleanly as they appear."}
 ${q > 0.6 ? "- This data touches contested categories. Name the contestedness when it's relevant." : "- The categories appear neutral. Look for what's been naturalized."}
@@ -120,7 +186,7 @@ ${moe > 60 ? `- ${moe}% MOE coverage — well-documented uncertainty.` : `- Only
 
 PRINCIPLES:
 - Translation, not judgment. Surface what's there and what's absent without editorializing.
-- Be specific. The value is in concrete detail, not general observation.
+- Be specific. When you have actual data, use it. Named counties, real numbers.
 - If something is absent from the profile, say so — don't construct meaning from silence.
 - Never mention Rose Glass, dimensional scores, or framework names. Just speak.
 - Plain language. No academic hedging. No "it is important to note."
