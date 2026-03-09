@@ -56,7 +56,7 @@ function EntryGate({ onEnter }: { onEnter: () => void }) {
             temporal depth, and lens interference. Together they reveal not bias, but <em>emphasis</em>.
           </p>
           <p>
-            Pick a topic. Pick a date. Watch the world tell itself differently.
+            Pick an entity. Pick a date. Watch it render differently through every lens.
           </p>
         </div>
 

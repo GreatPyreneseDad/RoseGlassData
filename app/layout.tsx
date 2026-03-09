@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rose Glass News",
+  title: "Rose Glass",
   description: "IPAI Dimensional News Analysis Platform",
 };
 
