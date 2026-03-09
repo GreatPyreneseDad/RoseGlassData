@@ -5,9 +5,8 @@ import { SampleResult } from "../sample/route";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Keyword → Census topic mapping for live data injection
 const TOPIC_TRIGGERS: Array<{ patterns: RegExp[]; topic: string }> = [
-  { patterns: [/youth.*(disconnect|not.*(work|school)|neither)/i, /disconnected youth/i], topic: "youth_disconnected" },
+  { patterns: [/youth.*(disconnect|not.*(work|school)|neither)/i, /disconnected youth/i, /neet/i, /youth.*rate/i], topic: "youth_disconnected" },
   { patterns: [/poverty rate/i, /below poverty/i, /poor(est)? (county|area|place)/i], topic: "poverty_rate" },
   { patterns: [/median income/i, /household income/i, /richest.*(county|area)/i], topic: "median_income" },
   { patterns: [/wage gap/i, /earnings.*sex/i, /women.*earn/i, /gender.*pay/i], topic: "earnings_sex" },
@@ -17,30 +16,49 @@ const TOPIC_TRIGGERS: Array<{ patterns: RegExp[]; topic: string }> = [
   { patterns: [/housing.*(burden|cost)/i, /rent.*income/i, /cost.burden/i], topic: "housing_cost_burden" },
 ];
 
-function detectTopic(message: string): string | null {
-  for (const { patterns, topic } of TOPIC_TRIGGERS) {
-    if (patterns.some(p => p.test(message))) return topic;
+const STATE_NAMES = [
+  "alabama","alaska","arizona","arkansas","california","colorado","connecticut",
+  "delaware","florida","georgia","hawaii","idaho","illinois","indiana","iowa",
+  "kansas","kentucky","louisiana","maine","maryland","massachusetts","michigan",
+  "minnesota","mississippi","missouri","montana","nebraska","nevada",
+  "new hampshire","new jersey","new mexico","new york","north carolina",
+  "north dakota","ohio","oklahoma","oregon","pennsylvania","rhode island",
+  "south carolina","south dakota","tennessee","texas","utah","vermont",
+  "virginia","washington","west virginia","wisconsin","wyoming"
+];
+
+function detectTopicAndState(message: string): { topic: string | null; state: string | null } {
+  let topic: string | null = null;
+  for (const { patterns, topic: t } of TOPIC_TRIGGERS) {
+    if (patterns.some(p => p.test(message))) { topic = t; break; }
   }
-  return null;
+
+  let state: string | null = null;
+  const lower = message.toLowerCase();
+  for (const s of STATE_NAMES) {
+    if (lower.includes(s)) { state = s; break; }
+  }
+
+  return { topic, state };
 }
 
 async function fetchSample(
   dataset_id: string,
   vintage: number,
-  topic: string
+  topic: string,
+  state?: string
 ): Promise<SampleResult | null> {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/sample`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataset_id, vintage, topic }),
-      signal: AbortSignal.timeout(25_000),
-    });
+    const body: Record<string, unknown> = { dataset_id, vintage, topic };
+    if (state) body.state = state;
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/sample`,
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(25_000) }
+    );
     if (!res.ok) return null;
     return await res.json();
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 export async function POST(request: NextRequest) {
@@ -51,12 +69,10 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDB();
-
     const sessionRes = await db.query(
       `SELECT s.*, p.psi, p.rho, p.q, p.f, p.tau, p.lambda,
               p.absences, p.moe_coverage, p.lens_summary
-       FROM db_sessions s
-       LEFT JOIN rg_profiles p ON p.session_id = s.id
+       FROM db_sessions s LEFT JOIN rg_profiles p ON p.session_id = s.id
        WHERE s.id = $1`,
       [session_id]
     );
@@ -65,24 +81,22 @@ export async function POST(request: NextRequest) {
     }
     const session = sessionRes.rows[0];
 
-    const conceptsRes = await db.query(
-      `SELECT concept, COUNT(*) as count,
-              SUM(CASE WHEN has_moe THEN 1 ELSE 0 END) as moe_count
-       FROM db_variables WHERE session_id = $1
-       GROUP BY concept ORDER BY count DESC LIMIT 40`,
-      [session_id]
-    );
+    const [conceptsRes, histRes] = await Promise.all([
+      db.query(
+        `SELECT concept, COUNT(*) as count, SUM(CASE WHEN has_moe THEN 1 ELSE 0 END) as moe_count
+         FROM db_variables WHERE session_id = $1 GROUP BY concept ORDER BY count DESC LIMIT 40`,
+        [session_id]
+      ),
+      db.query(
+        `SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
+        [session_id]
+      )
+    ]);
 
-    const histRes = await db.query(
-      `SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
-      [session_id]
-    );
-
-    // Detect if this question can be grounded with actual data
-    const detectedTopic = detectTopic(message);
+    const { topic: detectedTopic, state: detectedState } = detectTopicAndState(message);
     let sampleData: SampleResult | null = null;
     if (detectedTopic) {
-      sampleData = await fetchSample(session.dataset_id, session.vintage, detectedTopic);
+      sampleData = await fetchSample(session.dataset_id, session.vintage, detectedTopic, detectedState || undefined);
     }
 
     const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData);
@@ -93,20 +107,17 @@ export async function POST(request: NextRequest) {
     );
 
     const history = histRes.rows;
-    const messages = [
-      ...history.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
-      { role: "user" as const, content: message }
-    ];
-
     const response = await anthropic.messages.create({
       model: "claude-opus-4-5-20251101",
       max_tokens: 1024,
       system: systemPrompt,
-      messages,
+      messages: [
+        ...history.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
+        { role: "user" as const, content: message }
+      ],
     });
 
     const reply = response.content[0].type === "text" ? response.content[0].text : "";
-
     await db.query(
       `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
       [session_id, "assistant", reply]
@@ -143,21 +154,21 @@ function buildSystemPrompt(
 
   let dataSection = "";
   if (sampleData) {
-    const rowSummary = sampleData.rows.slice(0, 20).map(r => {
-      const name = r["NAME"] || r["state"] || r["county"] || "?";
-      const vals = sampleData.variables
-        .map(v => `${v}: ${r[v] ?? "N/A"}`)
-        .join(", ");
-      return `  ${name}: ${vals}`;
+    const rowSummary = sampleData.rows.map(r => {
+      const name = r["NAME"] || "?";
+      const rate = r["_rate"] ? `NEET rate: ${r["_rate"]}` : "";
+      const count = r["_neet_count"] ? `, count: ${r["_neet_count"]}` : "";
+      const total = sampleData.variables[0] ? `, total pop: ${r[sampleData.variables[0]] ?? "N/A"}` : "";
+      return `  ${name}${rate ? ": " + rate : ""}${count}${total}`;
     }).join("\n");
 
     dataSection = `
-LIVE DATA — USE THESE ACTUAL VALUES IN YOUR RESPONSE:
+LIVE DATA — THESE ARE REAL CENSUS API VALUES. USE THEM. CITE SPECIFIC COUNTIES AND NUMBERS:
 Query: ${sampleData.query_description}
 ${sampleData.note ? `Note: ${sampleData.note}` : ""}
 ${rowSummary}
 
-These are real numbers from the Census API for this dataset. Cite them specifically. Do not approximate or generalize when you have actual figures.`;
+Do not approximate. Do not say "I'd need to query." You have the data above.`;
   }
 
   return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
@@ -177,18 +188,18 @@ HOW IT WAS BUILT:
 ${session.lens_summary}
 ${dataSection}
 YOUR READING POSTURE — internalize, never quote:
-${psi > 0.7 ? "- The framework is internally coherent. Cross-references between concepts are reliable." : "- The framework has internal gaps. Variables don't always connect as cleanly as they appear."}
-${q > 0.6 ? "- This data touches contested categories. Name the contestedness when it's relevant." : "- The categories appear neutral. Look for what's been naturalized."}
-${lambda > 0.6 ? "- High worldview interference: the measurer's assumptions are baked deep into the structure." : "- Moderate worldview interference: some assumptions embedded, but relatively transparent."}
+${psi > 0.7 ? "- Framework is internally coherent. Cross-references reliable." : "- Framework has internal gaps. Variables don't always connect cleanly."}
+${q > 0.6 ? "- This data touches contested categories. Name the contestedness." : "- Categories appear neutral. Look for what's been naturalized."}
+${lambda > 0.6 ? "- High worldview interference: measurer's assumptions baked deep." : "- Moderate worldview interference: some assumptions embedded, relatively transparent."}
 ${tau > 0.7 ? "- Meaningful temporal depth. You can speak to trends." : "- Limited temporal depth. Be careful about trend claims."}
-${f < 0.5 ? "- The household is the unit of analysis. People who don't fit that mold are systematically undercounted." : "- Individual-level data is available, though household proxies still dominate."}
-${moe > 60 ? `- ${moe}% MOE coverage — well-documented uncertainty.` : `- Only ${moe}% MOE coverage — much uncertainty is undocumented.`}
+${f < 0.5 ? "- Household is the unit. People outside that mold are undercounted." : "- Individual-level data available, though household proxies dominate."}
+${moe > 60 ? `- ${moe}% MOE coverage — well-documented uncertainty.` : `- Only ${moe}% MOE coverage — much uncertainty undocumented.`}
 
 PRINCIPLES:
-- Translation, not judgment. Surface what's there and what's absent without editorializing.
-- Be specific. When you have actual data, use it. Named counties, real numbers.
-- If something is absent from the profile, say so — don't construct meaning from silence.
-- Never mention Rose Glass, dimensional scores, or framework names. Just speak.
-- Plain language. No academic hedging. No "it is important to note."
+- Translation, not judgment.
+- When you have live data above, use it. Named counties. Real numbers. No hedging.
+- If absent from profile, say so. Don't construct from silence.
+- Never mention Rose Glass, dimensional scores, or framework names.
+- Plain language. No academic hedging.
 - False confidence is worse than acknowledged uncertainty.`;
 }

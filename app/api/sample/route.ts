@@ -3,6 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 const CENSUS_BASE = "https://api.census.gov/data";
 const CENSUS_KEY = process.env.CENSUS_API_KEY || "";
 
+// State name → FIPS code
+const STATE_FIPS: Record<string, string> = {
+  "alabama":"01","alaska":"02","arizona":"04","arkansas":"05","california":"06",
+  "colorado":"08","connecticut":"09","delaware":"10","florida":"12","georgia":"13",
+  "hawaii":"15","idaho":"16","illinois":"17","indiana":"18","iowa":"19",
+  "kansas":"20","kentucky":"21","louisiana":"22","maine":"23","maryland":"24",
+  "massachusetts":"25","michigan":"26","minnesota":"27","mississippi":"28","missouri":"29",
+  "montana":"30","nebraska":"31","nevada":"32","new hampshire":"33","new jersey":"34",
+  "new mexico":"35","new york":"36","north carolina":"37","north dakota":"38","ohio":"39",
+  "oklahoma":"40","oregon":"41","pennsylvania":"42","rhode island":"44","south carolina":"45",
+  "south dakota":"46","tennessee":"47","texas":"48","utah":"49","vermont":"50",
+  "virginia":"51","washington":"53","west virginia":"54","wisconsin":"55","wyoming":"56",
+};
+
 export interface SampleResult {
   query_description: string;
   variables: string[];
@@ -11,8 +25,6 @@ export interface SampleResult {
   note?: string;
 }
 
-// rate_numerator_vars: summed and divided by rate_denominator_var to sort by derived rate
-// min_denominator: exclude counties too small to be meaningful
 interface TopicMapping {
   vars: string[];
   label: string;
@@ -24,18 +36,10 @@ interface TopicMapping {
 
 const VARIABLE_MAP: Record<string, TopicMapping> = {
   youth_disconnected: {
-    // B14005: Sex by School Enrollment by Employment Status, 16-19 years
-    // NEET = not enrolled + (unemployed OR not in labor force), HS grad + non-HS grad, male + female
     vars: [
-      "B14005_001E",  // Total 16-19
-      "B14005_010E",  // Male: Not enrolled, HS grad, Unemployed
-      "B14005_011E",  // Male: Not enrolled, HS grad, Not in labor force
-      "B14005_014E",  // Male: Not enrolled, <HS, Unemployed
-      "B14005_015E",  // Male: Not enrolled, <HS, Not in labor force
-      "B14005_024E",  // Female: Not enrolled, HS grad, Unemployed
-      "B14005_025E",  // Female: Not enrolled, HS grad, Not in labor force
-      "B14005_028E",  // Female: Not enrolled, <HS, Unemployed
-      "B14005_029E",  // Female: Not enrolled, <HS, Not in labor force
+      "B14005_001E",
+      "B14005_010E","B14005_011E","B14005_014E","B14005_015E",
+      "B14005_024E","B14005_025E","B14005_028E","B14005_029E",
     ],
     label: "Youth 16-19 NEET rate (not enrolled, not employed) by county",
     geo: "county",
@@ -44,10 +48,10 @@ const VARIABLE_MAP: Record<string, TopicMapping> = {
       "B14005_024E","B14005_025E","B14005_028E","B14005_029E"
     ],
     rate_denominator_var: "B14005_001E",
-    min_denominator: 200,
+    min_denominator: 500,
   },
   poverty_rate: {
-    vars: ["B17001_001E", "B17001_002E"],
+    vars: ["B17001_001E","B17001_002E"],
     label: "Population below poverty level by county",
     geo: "county",
     rate_numerator_vars: ["B17001_002E"],
@@ -61,32 +65,32 @@ const VARIABLE_MAP: Record<string, TopicMapping> = {
     min_denominator: 0,
   },
   earnings_sex: {
-    vars: ["B20017_001E", "B20017_002E", "B20017_003E"],
+    vars: ["B20017_001E","B20017_002E","B20017_003E"],
     label: "Median earnings by sex, full-time year-round workers by state",
     geo: "state",
   },
   commute_time: {
-    vars: ["B08136_001E", "B08136_002E", "B08136_003E"],
+    vars: ["B08136_001E","B08136_002E","B08136_003E"],
     label: "Aggregate travel time to work by means (car vs transit) by county",
     geo: "county",
     min_denominator: 0,
   },
   foreign_born: {
-    vars: ["B05001_001E", "B05001_006E"],
+    vars: ["B05001_001E","B05001_006E"],
     label: "Foreign-born population share by state",
     geo: "state",
     rate_numerator_vars: ["B05001_006E"],
     rate_denominator_var: "B05001_001E",
   },
   language_isolation: {
-    vars: ["B16004_001E", "B16004_067E"],
+    vars: ["B16004_001E","B16004_067E"],
     label: "Linguistically isolated households by state",
     geo: "state",
     rate_numerator_vars: ["B16004_067E"],
     rate_denominator_var: "B16004_001E",
   },
   housing_cost_burden: {
-    vars: ["B25070_001E", "B25070_010E"],
+    vars: ["B25070_001E","B25070_010E"],
     label: "Renter households paying 50%+ of income on rent by county",
     geo: "county",
     rate_numerator_vars: ["B25070_010E"],
@@ -97,23 +101,28 @@ const VARIABLE_MAP: Record<string, TopicMapping> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { dataset_id, vintage, topic } = await request.json();
+    const { dataset_id, vintage, topic, state } = await request.json();
     if (!dataset_id || !vintage || !topic) {
-      return NextResponse.json(
-        { error: "dataset_id, vintage, topic required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "dataset_id, vintage, topic required" }, { status: 400 });
     }
 
     const mapping = VARIABLE_MAP[topic];
     if (!mapping) {
-      return NextResponse.json({
-        error: `Unknown topic: ${topic}`,
-        available: Object.keys(VARIABLE_MAP),
-      }, { status: 400 });
+      return NextResponse.json({ error: `Unknown topic: ${topic}`, available: Object.keys(VARIABLE_MAP) }, { status: 400 });
     }
 
-    const result = await queryCensus(dataset_id, vintage, mapping);
+    // Resolve state name to FIPS if provided
+    let stateFips: string | undefined;
+    if (state) {
+      stateFips = STATE_FIPS[state.toLowerCase().trim()];
+      if (!stateFips) {
+        // Try partial match
+        const key = Object.keys(STATE_FIPS).find(k => k.includes(state.toLowerCase().trim()));
+        stateFips = key ? STATE_FIPS[key] : undefined;
+      }
+    }
+
+    const result = await queryCensus(dataset_id, vintage, mapping, stateFips);
     return NextResponse.json(result);
 
   } catch (error: unknown) {
@@ -126,7 +135,8 @@ export async function POST(request: NextRequest) {
 async function queryCensus(
   dataset_id: string,
   vintage: number,
-  mapping: TopicMapping
+  mapping: TopicMapping,
+  stateFips?: string
 ): Promise<SampleResult> {
   const { vars, label, geo } = mapping;
   const getParam = ["NAME", ...vars].join(",");
@@ -134,7 +144,12 @@ async function queryCensus(
   let forClause = "";
   if (geo === "us") forClause = "for=us:1";
   else if (geo === "state") forClause = "for=state:*";
-  else if (geo === "county") forClause = "for=county:*&in=state:*";
+  else if (geo === "county") {
+    // If state FIPS provided, restrict to that state
+    forClause = stateFips
+      ? `for=county:*&in=state:${stateFips}`
+      : "for=county:*&in=state:*";
+  }
 
   const keyParam = CENSUS_KEY ? `&key=${CENSUS_KEY}` : "";
   const url = `${CENSUS_BASE}/${vintage}/${dataset_id}?get=${getParam}&${forClause}${keyParam}`;
@@ -149,37 +164,28 @@ async function queryCensus(
   const headers = raw[0];
   const rows = raw.slice(1);
 
-  // Build structured rows
   const structured = rows.map(row => {
     const obj: Record<string, string> = {};
     headers.forEach((h, i) => { obj[h] = row[i]; });
     return obj;
   });
 
-  // Compute derived rate if configured, else sort by first var
   const minDenom = mapping.min_denominator ?? 0;
-  let sortKey: (r: Record<string, string>) => number;
 
-  if (mapping.rate_numerator_vars && mapping.rate_denominator_var) {
-    const numVars = mapping.rate_numerator_vars;
-    const denomVar = mapping.rate_denominator_var;
-    sortKey = (r) => {
-      const denom = Number(r[denomVar]);
-      if (!denom || denom < minDenom) return -1;
-      const num = numVars.reduce((sum, v) => sum + (Number(r[v]) || 0), 0);
-      return num / denom;
-    };
-  } else {
-    const firstVar = vars[0];
-    sortKey = (r) => Number(r[firstVar]) || 0;
-  }
+  const sortKey: (r: Record<string, string>) => number =
+    mapping.rate_numerator_vars && mapping.rate_denominator_var
+      ? (r) => {
+          const denom = Number(r[mapping.rate_denominator_var!]);
+          if (!denom || denom < minDenom) return -1;
+          return mapping.rate_numerator_vars!.reduce((s, v) => s + (Number(r[v]) || 0), 0) / denom;
+        }
+      : (r) => Number(r[vars[0]]) || 0;
 
-  // Filter suppressed/invalid, sort descending
   const valid = structured.filter(r => {
     const denom = mapping.rate_denominator_var
       ? Number(r[mapping.rate_denominator_var])
       : Number(r[vars[0]]);
-    return denom > (minDenom ?? 0)
+    return denom > minDenom
       && !Object.values(r).some(v => v === "-666666666" || v === "-888888888");
   });
 
@@ -191,7 +197,7 @@ async function queryCensus(
     const denomVar = mapping.rate_denominator_var;
     sorted.forEach(r => {
       const denom = Number(r[denomVar]);
-      const num = numVars.reduce((sum, v) => sum + (Number(r[v]) || 0), 0);
+      const num = numVars.reduce((s, v) => s + (Number(r[v]) || 0), 0);
       r["_rate"] = denom > 0 ? (num / denom * 100).toFixed(1) + "%" : "N/A";
       r["_neet_count"] = String(num);
     });
@@ -200,18 +206,11 @@ async function queryCensus(
   let combined = sorted;
   let note: string | undefined;
 
-  if (geo === "county" && sorted.length > 20) {
-    const top10 = sorted.slice(0, 10);
-    const bottom10 = sorted.slice(-10).reverse();
-    combined = [...top10, ...bottom10];
-    note = `Top 10 highest and bottom 10 lowest of ${sorted.length} counties by rate`;
+  const scopeLabel = stateFips ? `in state FIPS ${stateFips}` : "nationally";
+  if (geo === "county" && sorted.length > 15) {
+    combined = sorted.slice(0, 15);
+    note = `Top 15 of ${sorted.length} counties ${scopeLabel} by rate`;
   }
 
-  return {
-    query_description: label,
-    variables: vars,
-    geography: geo,
-    rows: combined,
-    note,
-  };
+  return { query_description: label, variables: vars, geography: geo, rows: combined, note };
 }
