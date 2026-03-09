@@ -137,7 +137,8 @@ function buildSystemPrompt(
     coherence: number; sourceCount: number;
   }>,
   poemSection: string,
-  factualContext: string
+  factualContext: string,
+  domainConfig?: DomainConfig
 ): string {
   const dimRows = timeline
     .map((d) =>
