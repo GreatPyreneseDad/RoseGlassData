@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
-import { SampleResult } from "../sample/route";
+import { queryCensus, resolveStateFips, SampleResult } from "@/lib/census-sampler";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const TOPIC_TRIGGERS: Array<{ patterns: RegExp[]; topic: string }> = [
-  { patterns: [/youth.*(disconnect|not.*(work|school)|neither)/i, /disconnected youth/i, /neet/i, /youth.*rate/i], topic: "youth_disconnected" },
+  { patterns: [/youth.*(disconnect|not.*(work|school)|neither|rate)/i, /disconnected youth/i, /\bneet\b/i], topic: "youth_disconnected" },
   { patterns: [/poverty rate/i, /below poverty/i, /poor(est)? (county|area|place)/i], topic: "poverty_rate" },
   { patterns: [/median income/i, /household income/i, /richest.*(county|area)/i], topic: "median_income" },
   { patterns: [/wage gap/i, /earnings.*sex/i, /women.*earn/i, /gender.*pay/i], topic: "earnings_sex" },
   { patterns: [/commute/i, /travel time.*work/i, /transit.*work/i], topic: "commute_time" },
-  { patterns: [/foreign.?born/i, /immigrant population/i, /immigration/i], topic: "foreign_born" },
+  { patterns: [/foreign.?born/i, /immigrant population/i], topic: "foreign_born" },
   { patterns: [/language.*isolat/i, /linguistically/i, /english.*ability/i], topic: "language_isolation" },
   { patterns: [/housing.*(burden|cost)/i, /rent.*income/i, /cost.burden/i], topic: "housing_cost_burden" },
 ];
@@ -32,33 +32,15 @@ function detectTopicAndState(message: string): { topic: string | null; state: st
   for (const { patterns, topic: t } of TOPIC_TRIGGERS) {
     if (patterns.some(p => p.test(message))) { topic = t; break; }
   }
-
   let state: string | null = null;
   const lower = message.toLowerCase();
-  for (const s of STATE_NAMES) {
+  // Try two-word state names first, then single-word
+  const twoWord = STATE_NAMES.filter(s => s.includes(" "));
+  const oneWord = STATE_NAMES.filter(s => !s.includes(" "));
+  for (const s of [...twoWord, ...oneWord]) {
     if (lower.includes(s)) { state = s; break; }
   }
-
   return { topic, state };
-}
-
-async function fetchSample(
-  dataset_id: string,
-  vintage: number,
-  topic: string,
-  state?: string
-): Promise<SampleResult | null> {
-  try {
-    const body: Record<string, unknown> = { dataset_id, vintage, topic };
-    if (state) body.state = state;
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/sample`,
-      { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body), signal: AbortSignal.timeout(25_000) }
-    );
-    if (!res.ok) return null;
-    return await res.json();
-  } catch { return null; }
 }
 
 export async function POST(request: NextRequest) {
@@ -93,10 +75,12 @@ export async function POST(request: NextRequest) {
       )
     ]);
 
+    // Detect topic and state — call Census API directly (no internal HTTP)
     const { topic: detectedTopic, state: detectedState } = detectTopicAndState(message);
     let sampleData: SampleResult | null = null;
     if (detectedTopic) {
-      sampleData = await fetchSample(session.dataset_id, session.vintage, detectedTopic, detectedState || undefined);
+      const stateFips = detectedState ? resolveStateFips(detectedState) : undefined;
+      sampleData = await queryCensus(session.dataset_id, session.vintage, detectedTopic, stateFips);
     }
 
     const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData);
@@ -106,13 +90,12 @@ export async function POST(request: NextRequest) {
       [session_id, "user", message]
     );
 
-    const history = histRes.rows;
     const response = await anthropic.messages.create({
       model: "claude-opus-4-5-20251101",
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
-        ...history.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
+        ...histRes.rows.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
         { role: "user" as const, content: message }
       ],
     });
@@ -153,22 +136,26 @@ function buildSystemPrompt(
   const moe = Number(session.moe_coverage) || 0;
 
   let dataSection = "";
-  if (sampleData) {
+  if (sampleData && sampleData.rows.length > 0) {
     const rowSummary = sampleData.rows.map(r => {
       const name = r["NAME"] || "?";
-      const rate = r["_rate"] ? `NEET rate: ${r["_rate"]}` : "";
-      const count = r["_neet_count"] ? `, count: ${r["_neet_count"]}` : "";
-      const total = sampleData.variables[0] ? `, total pop: ${r[sampleData.variables[0]] ?? "N/A"}` : "";
-      return `  ${name}${rate ? ": " + rate : ""}${count}${total}`;
+      const rate = r["_rate"] ? `${r["_rate"]}` : "";
+      const count = r["_neet_count"] ? ` (${r["_neet_count"]} youth)` : "";
+      const total = sampleData.variables[0] && r[sampleData.variables[0]]
+        ? ` of ${r[sampleData.variables[0]]} total` : "";
+      return `  ${name}: ${rate}${count}${total}`;
     }).join("\n");
 
     dataSection = `
-LIVE DATA — THESE ARE REAL CENSUS API VALUES. USE THEM. CITE SPECIFIC COUNTIES AND NUMBERS:
-Query: ${sampleData.query_description}
-${sampleData.note ? `Note: ${sampleData.note}` : ""}
+
+LIVE CENSUS DATA — REAL VALUES FROM THIS DATASET. YOU MUST USE THESE IN YOUR RESPONSE:
+${sampleData.query_description}
+${sampleData.note ? `(${sampleData.note})` : ""}
 ${rowSummary}
 
-Do not approximate. Do not say "I'd need to query." You have the data above.`;
+These numbers are from the actual Census API. Name specific counties and cite their exact rates.
+Do not hedge. Do not say you need to query. Do not approximate. Use what is above.
+`;
   }
 
   return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
@@ -188,17 +175,17 @@ HOW IT WAS BUILT:
 ${session.lens_summary}
 ${dataSection}
 YOUR READING POSTURE — internalize, never quote:
-${psi > 0.7 ? "- Framework is internally coherent. Cross-references reliable." : "- Framework has internal gaps. Variables don't always connect cleanly."}
-${q > 0.6 ? "- This data touches contested categories. Name the contestedness." : "- Categories appear neutral. Look for what's been naturalized."}
-${lambda > 0.6 ? "- High worldview interference: measurer's assumptions baked deep." : "- Moderate worldview interference: some assumptions embedded, relatively transparent."}
+${psi > 0.7 ? "- Framework is internally coherent." : "- Framework has internal gaps."}
+${q > 0.6 ? "- Contested categories present. Name the contestedness." : "- Categories appear neutral. Look for what's been naturalized."}
+${lambda > 0.6 ? "- High worldview interference: measurer's assumptions baked deep." : "- Moderate worldview interference."}
 ${tau > 0.7 ? "- Meaningful temporal depth. You can speak to trends." : "- Limited temporal depth. Be careful about trend claims."}
 ${f < 0.5 ? "- Household is the unit. People outside that mold are undercounted." : "- Individual-level data available, though household proxies dominate."}
-${moe > 60 ? `- ${moe}% MOE coverage — well-documented uncertainty.` : `- Only ${moe}% MOE coverage — much uncertainty undocumented.`}
+${moe > 60 ? `- ${moe}% MOE coverage.` : `- Only ${moe}% MOE coverage — much uncertainty undocumented.`}
 
 PRINCIPLES:
+- When you have live data above, USE IT. Named counties. Exact percentages. No hedging.
 - Translation, not judgment.
-- When you have live data above, use it. Named counties. Real numbers. No hedging.
-- If absent from profile, say so. Don't construct from silence.
+- If absent from the profile, say so. Don't construct from silence.
 - Never mention Rose Glass, dimensional scores, or framework names.
 - Plain language. No academic hedging.
 - False confidence is worse than acknowledged uncertainty.`;
