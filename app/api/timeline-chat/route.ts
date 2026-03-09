@@ -66,8 +66,7 @@ async function fetchFactualContext(topic: string, startDate: string, endDate: st
     });
     if (!response.ok) return "";
     const data = await response.json();
-    return data.content?.filter((b: {type:string}) => b.type==="text")?.map((b: {text:string}) => b.text)?.join("
-")?.trim() || "";
+    return data.content?.filter((b: {type:string}) => b.type==="text")?.map((b: {text:string}) => b.text)?.join("\n")?.trim() || "";
   } catch (err) { console.warn("[timeline-chat] web search failed:", err); return ""; }
 }
 
@@ -109,8 +108,7 @@ ${date}:`);
       }
     }
   }
-  return lines.join("
-");
+  return lines.join("\n");
 }
 
 function buildSystemPrompt(topic: string, startDate: string, endDate: string, contextBlock: string, factualContext: string, domainConfig?: DomainConfig): string {
