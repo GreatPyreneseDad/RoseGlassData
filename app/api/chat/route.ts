@@ -1,213 +1,128 @@
-import { NextRequest } from "next/server";
-import { initDB, getAnalysisWithSources } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { getDB } from "@/lib/db";
+import Anthropic from "@anthropic-ai/sdk";
 
-let dbReady = false;
-
-async function ensureDB() {
-  if (!dbReady) {
-    await initDB();
-    dbReady = true;
-  }
-}
-
-function buildSystemPrompt(analysis: {
-  topic: string;
-  date: string;
-  sources: Array<{
-    source_name: string;
-    calibration: string;
-    article_text: string;
-    psi: number;
-    rho: number;
-    q: number;
-    f: number;
-    tau: number;
-    lambda_val: number;
-    coherence: number;
-  }>;
-}): string {
-  const sourceBlocks = analysis.sources
-    .map((s) => {
-      return `━━━ ${s.source_name} | ${s.calibration} ━━━
-Ψ=${s.psi?.toFixed(3) ?? "?"} ρ=${s.rho?.toFixed(3) ?? "?"} q=${s.q?.toFixed(3) ?? "?"} f=${s.f?.toFixed(3) ?? "?"} τ=${s.tau?.toFixed(3) ?? "?"} λ=${s.lambda_val?.toFixed(3) ?? "?"} | Coherence=${s.coherence?.toFixed(3) ?? "?"}
-${s.article_text || "(no text available)"}`;
-    })
-    .join("\n\n");
-
-  return `You are Rose Glass — a translation layer between news sources and the reader.
-
-You do not judge. You do not rank. You translate.
-
-You have analyzed ${analysis.sources.length} sources covering "${analysis.topic}" on ${analysis.date}.
-
-ROSE GLASS DIMENSIONS:
-- Ψ (psi): internal consistency — does the source contradict itself?
-- ρ (rho): accumulated wisdom — depth of knowledge referenced
-- q (activation): emotional/moral charge — how much feeling is carried
-- f (social): community framing — who is the "we" in this story?
-- τ (tau): temporal depth — how much history is invoked
-- λ (decay): narrative pressure — urgency and weight of the story
-
-SOURCES:
-${sourceBlocks}
-
-When the user asks about the story:
-- Reference specific phrases from the article text
-- Explain what the dimensional scores reveal about HOW the source tells the story
-- Show differences between sources as translation differences, not quality differences
-- Use quotes from the actual articles to ground your observations
-- Never say one source is better or worse`;
-}
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { analysis_id, message, history } = body;
-
-    console.log("[chat] analysis_id:", analysis_id);
-
-    if (!analysis_id || !message) {
-      return new Response(
-        JSON.stringify({ error: "analysis_id and message are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+    const { session_id, message } = await request.json();
+    if (!session_id || !message) {
+      return NextResponse.json({ error: "session_id and message required" }, { status: 400 });
     }
 
-    await ensureDB();
+    const db = getDB();
 
-    const analysis = await getAnalysisWithSources(analysis_id);
-    console.log("[chat] analysis found:", !!analysis);
-
-    if (!analysis) {
-      return new Response(
-        JSON.stringify({ error: "Analysis not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
+    const sessionRes = await db.query(
+      `SELECT s.*, p.psi, p.rho, p.q, p.f, p.tau, p.lambda,
+              p.absences, p.moe_coverage, p.lens_summary
+       FROM db_sessions s
+       LEFT JOIN rg_profiles p ON p.session_id = s.id
+       WHERE s.id = $1`,
+      [session_id]
+    );
+    if (sessionRes.rows.length === 0) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+    const session = sessionRes.rows[0];
 
-    const systemPrompt = buildSystemPrompt(analysis);
-    console.log("[chat] system prompt preview:", systemPrompt.slice(0, 200));
+    const conceptsRes = await db.query(
+      `SELECT concept, COUNT(*) as count,
+              SUM(CASE WHEN has_moe THEN 1 ELSE 0 END) as moe_count
+       FROM db_variables WHERE session_id = $1
+       GROUP BY concept ORDER BY count DESC LIMIT 40`,
+      [session_id]
+    );
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    const histRes = await db.query(
+      `SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
+      [session_id]
+    );
 
-    // Build messages (system is passed separately to Anthropic)
+    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows);
+
+    await db.query(
+      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      [session_id, "user", message]
+    );
+
+    const history = histRes.rows;
     const messages = [
-      ...(history || []).map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-      })),
-      { role: "user", content: message },
+      ...history.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
+      { role: "user" as const, content: message }
     ];
 
-    const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
-        stream: true,
-      }),
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-5-20251101",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
     });
 
-    if (!anthropicResponse.ok) {
-      const errText = await anthropicResponse.text();
-      console.error("[chat] Anthropic error:", errText);
-      return new Response(
-        JSON.stringify({ error: "Anthropic request failed: " + errText }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    const reply = response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Stream Anthropic SSE → forward as { content } chunks to ChatPanel
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        const reader = anthropicResponse.body?.getReader();
-        if (!reader) {
-          controller.close();
-          return;
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed) continue;
-
-              if (trimmed.startsWith("data: ")) {
-                const data = trimmed.slice(6);
-                if (data === "[DONE]") continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-
-                  // content_block_delta carries the text tokens
-                  if (
-                    parsed.type === "content_block_delta" &&
-                    parsed.delta?.type === "text_delta" &&
-                    parsed.delta?.text
-                  ) {
-                    controller.enqueue(
-                      encoder.encode(
-                        `data: ${JSON.stringify({ content: parsed.delta.text })}\n\n`
-                      )
-                    );
-                  }
-
-                  // message_stop signals end of stream
-                  if (parsed.type === "message_stop") {
-                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                  }
-                } catch {
-                  // Skip malformed lines
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error("[chat] stream error:", err);
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
-    console.error("[chat] error:", message);
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+    await db.query(
+      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      [session_id, "assistant", reply]
     );
+
+    return NextResponse.json({ reply });
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[chat]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function buildSystemPrompt(
+  session: Record<string, unknown>,
+  concepts: Array<{ concept: string; count: string; moe_count: string }>
+): string {
+  const absences = (session.absences as Array<{ domain: string; absence: string; significance: string }>) || [];
+  const topConcepts = concepts.slice(0, 20)
+    .map(c => `  ${c.concept} (${c.count} variables, ${c.moe_count} with error margins)`)
+    .join("\n");
+  const absenceList = absences
+    .map(a => `  [${a.domain}] ${a.absence}: ${a.significance}`)
+    .join("\n");
+
+  const psi = Number(session.psi) || 0.5;
+  const q = Number(session.q) || 0.5;
+  const f = Number(session.f) || 0.5;
+  const tau = Number(session.tau) || 0.5;
+  const lambda = Number(session.lambda) || 0.5;
+  const moe = Number(session.moe_coverage) || 0;
+
+  return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
+
+DATASET: ${session.name}
+SOURCE: ${session.dataset_id} vintage ${session.vintage}
+VARIABLES: ${session.variable_count} across ${session.concept_count} concept domains
+GEOGRAPHIES: ${(session.geography_depth as string[] || []).join(", ")}
+
+WHAT THIS DATA MEASURES:
+${topConcepts}
+
+WHAT IT DOES NOT MEASURE:
+${absenceList}
+
+HOW IT WAS BUILT:
+${session.lens_summary}
+
+YOUR READING POSTURE — internalize, never quote:
+${psi > 0.7 ? "- The framework is internally coherent. Cross-references between concepts are reliable." : "- The framework has internal gaps. Variables don't always connect as cleanly as they appear."}
+${q > 0.6 ? "- This data touches contested categories. Name the contestedness when it's relevant." : "- The categories appear neutral. Look for what's been naturalized."}
+${lambda > 0.6 ? "- High worldview interference: the measurer's assumptions are baked deep into the structure." : "- Moderate worldview interference: some assumptions embedded, but relatively transparent."}
+${tau > 0.7 ? "- Meaningful temporal depth. You can speak to trends." : "- Limited temporal depth. Be careful about trend claims."}
+${f < 0.5 ? "- The household is the unit of analysis. People who don't fit that mold are systematically undercounted." : "- Individual-level data is available, though household proxies still dominate."}
+${moe > 60 ? `- ${moe}% MOE coverage — well-documented uncertainty.` : `- Only ${moe}% MOE coverage — much uncertainty is undocumented.`}
+
+PRINCIPLES:
+- Translation, not judgment. Surface what's there and what's absent without editorializing.
+- Be specific. The value is in concrete detail, not general observation.
+- If something is absent from the profile, say so — don't construct meaning from silence.
+- Never mention Rose Glass, dimensional scores, or framework names. Just speak.
+- Plain language. No academic hedging. No "it is important to note."
+- False confidence is worse than acknowledged uncertainty.`;
 }
