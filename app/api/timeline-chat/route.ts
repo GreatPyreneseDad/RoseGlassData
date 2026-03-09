@@ -1,258 +1,187 @@
 import { NextRequest } from "next/server";
 import { getDB } from "@/lib/db";
 
-// ─────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────
-
-interface PoemRow {
-  date: string;
-  source_name: string;
-  cultural_lens: string;
-  poem: string;
-  psi: number; rho: number; q: number;
-  f: number; tau: number; lambda_val: number;
+interface SourceRow {
+  date: string; source_name: string; source_type: string;
+  calibration: string | null; url: string | null;
+  cultural_lens: string | null; poem: string | null;
+  veritas_score: number | null; veritas_assessment: string | null;
+  psi: number; rho: number; q: number; f: number; tau: number;
+  lambda_val: number; coherence: number;
 }
-
+interface DivergenceRow {
+  dimension: string; mean_val: number; std_dev: number; variance: number;
+}
 interface DomainConfig {
-  id: string;
-  name: string;
-  entity_label: string;
-  domain_question: string;
-  connector: string;
-  search_context: string | null;
-  deployment_tier: string;
+  id: string; name: string; entity_label: string; domain_question: string;
+  connector: string; search_context: string | null; deployment_tier: string;
 }
 
-// ─────────────────────────────────────────────────────────
-// Fetch poems
-// ─────────────────────────────────────────────────────────
-
-async function fetchPoems(topic: string, startDate: string, endDate: string): Promise<PoemRow[]> {
+async function fetchSourceData(topic: string, startDate: string, endDate: string): Promise<SourceRow[]> {
   try {
-    const result = await getDB().query<PoemRow>(
-      `SELECT a.date::text, s.source_name, s.cultural_lens, s.poem,
-              s.psi, s.rho, s.q, s.f, s.tau, s.lambda_val
+    const result = await getDB().query<SourceRow>(
+      `SELECT a.date::text, s.source_name, s.source_type, s.calibration, s.url,
+              s.cultural_lens, s.poem, s.veritas_score, s.veritas_assessment,
+              s.psi, s.rho, s.q, s.f, s.tau, s.lambda_val, s.coherence
        FROM sources s
        JOIN analyses a ON s.analysis_id = a.id
        JOIN entity_nodes n ON n.id = a.entity_node_id
-       WHERE UPPER(n.label) = UPPER($1)
-         AND a.date BETWEEN $2::date AND $3::date
-         AND s.poem IS NOT NULL
-       ORDER BY a.date ASC, s.source_name ASC`,
+       WHERE UPPER(n.label) = UPPER($1) AND a.date BETWEEN $2::date AND $3::date
+       ORDER BY a.date ASC, s.coherence DESC NULLS LAST`,
       [topic, startDate, endDate]
     );
     return result.rows;
-  } catch (err) {
-    console.warn("[timeline-chat] poem fetch failed:", err);
-    return [];
-  }
+  } catch (err) { console.warn("[timeline-chat] source fetch failed:", err); return []; }
 }
 
-// ─────────────────────────────────────────────────────────
-// Web search — factual grounding layer
-// Runs on every call to anchor Claude's responses in
-// verifiable facts, preventing confabulation from poems alone
-// ─────────────────────────────────────────────────────────
+async function fetchDivergence(topic: string, startDate: string, endDate: string): Promise<DivergenceRow[]> {
+  try {
+    const result = await getDB().query<DivergenceRow>(
+      `SELECT d.dimension,
+              ROUND(AVG(d.mean_val)::numeric,3)::float AS mean_val,
+              ROUND(AVG(d.std_dev)::numeric,3)::float AS std_dev,
+              ROUND(AVG(d.variance)::numeric,3)::float AS variance
+       FROM divergence d
+       JOIN analyses a ON d.analysis_id = a.id
+       JOIN entity_nodes n ON n.id = a.entity_node_id
+       WHERE UPPER(n.label) = UPPER($1) AND a.date BETWEEN $2::date AND $3::date
+       GROUP BY d.dimension ORDER BY AVG(d.std_dev) DESC`,
+      [topic, startDate, endDate]
+    );
+    return result.rows;
+  } catch (err) { console.warn("[timeline-chat] divergence fetch failed:", err); return []; }
+}
 
-async function fetchFactualContext(
-  topic: string,
-  startDate: string,
-  endDate: string,
-  userQuestion: string,
-  apiKey: string
-): Promise<string> {
+async function fetchFactualContext(topic: string, startDate: string, endDate: string, userQuestion: string, apiKey: string, connector: string): Promise<string> {
+  if (connector !== "gdelt" && connector !== "news") return "";
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "web-search-2025-03-05",
-      },
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 800,
+        model: "claude-haiku-4-5-20251001", max_tokens: 800,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{
-          role: "user",
-          content: `Search for key facts about "${topic}" between ${startDate} and ${endDate}. Focus on: specific events, casualties, named actors, confirmed figures, major developments. The user is asking: "${userQuestion}". Return only concrete verifiable facts — dates, numbers, names, confirmed events. Be brief and specific. No analysis.`
-        }]
+        messages: [{ role: "user", content: `Search for key facts about "${topic}" between ${startDate} and ${endDate}. User is asking: "${userQuestion}". Return only concrete verifiable facts — dates, numbers, names, confirmed events. Be brief.` }]
       }),
     });
-
     if (!response.ok) return "";
-
     const data = await response.json();
-    return data.content
-      ?.filter((b: { type: string }) => b.type === "text")
-      ?.map((b: { text: string }) => b.text)
-      ?.join("\n")
-      ?.trim() || "";
-  } catch (err) {
-    console.warn("[timeline-chat] web search failed:", err);
-    return "";
-  }
+    return data.content?.filter((b: {type:string}) => b.type==="text")?.map((b: {text:string}) => b.text)?.join("
+")?.trim() || "";
+  } catch (err) { console.warn("[timeline-chat] web search failed:", err); return ""; }
 }
 
-// ─────────────────────────────────────────────────────────
-// Build poem section
-// ─────────────────────────────────────────────────────────
-
-function buildPoemSection(poems: PoemRow[]): string {
-  if (poems.length === 0) return "";
-
-  const byDate: Record<string, PoemRow[]> = {};
-  for (const p of poems) {
-    if (!byDate[p.date]) byDate[p.date] = [];
-    byDate[p.date].push(p);
+function buildContextBlock(
+  sources: SourceRow[],
+  divergence: DivergenceRow[],
+  timeline: Array<{date:string;psi:number;rho:number;q:number;f:number;tau:number;lambda:number;coherence:number;sourceCount:number}>
+): string {
+  const lines: string[] = [];
+  lines.push("DIMENSIONAL TIMELINE (aggregate per date):");
+  lines.push("date       | Ψ     ρ     q     f     τ     λ     | coherence | n");
+  for (const d of timeline) {
+    lines.push(`${d.date} | ${d.psi?.toFixed(2)} ${d.rho?.toFixed(2)} ${d.q?.toFixed(2)} ${d.f?.toFixed(2)} ${d.tau?.toFixed(2)} ${d.lambda?.toFixed(2)} | ${d.coherence?.toFixed(2)} | ${d.sourceCount}`);
   }
-
-  const lines: string[] = ["WITNESS POEMS (lens through which sources saw events):"];
-  for (const date of Object.keys(byDate).sort()) {
-    lines.push(`\n${date}:`);
-    for (const p of byDate[date]) {
-      const src = (p.source_name || "unknown").split("(")[0].trim();
-      lines.push(`  [${src} | ${p.cultural_lens || "unknown"}]`);
-      for (const line of p.poem.split("\n")) {
-        lines.push(`    ${line}`);
+  if (divergence.length > 0) {
+    lines.push("
+DIVERGENCE (where sources disagreed most):");
+    lines.push("dimension | mean  | std_dev | variance");
+    for (const d of divergence) {
+      lines.push(`${d.dimension.padEnd(10)} | ${d.mean_val?.toFixed(3)} | ${d.std_dev?.toFixed(3)}   | ${d.variance?.toFixed(3)}`);
+    }
+  }
+  if (sources.length > 0) {
+    lines.push("
+SOURCE DETAIL:");
+    const byDate: Record<string,SourceRow[]> = {};
+    for (const s of sources) { if (!byDate[s.date]) byDate[s.date]=[]; byDate[s.date].push(s); }
+    for (const date of Object.keys(byDate).sort()) {
+      lines.push(`
+${date}:`);
+      for (const s of byDate[date]) {
+        const name = (s.source_name||"unknown").split("(")[0].trim();
+        const lens = s.cultural_lens||"unclassified";
+        const cal = s.calibration ? ` | calibration: ${s.calibration}` : "";
+        lines.push(`  [${name} | ${lens} | Ψ=${s.psi?.toFixed(2)} q=${s.q?.toFixed(2)} λ=${s.lambda_val?.toFixed(2)} | coherence=${s.coherence?.toFixed(2)}${s.veritas_score!=null?` veritas=${s.veritas_score.toFixed(2)}`:""}${cal}]`);
+        if (s.veritas_assessment) lines.push(`    veritas: ${s.veritas_assessment}`);
+        if (s.poem) lines.push(`    lens: ${s.poem.replace(/
+/g," / ")}`);
       }
     }
   }
-  return lines.join("\n");
+  return lines.join("
+");
 }
 
-// ─────────────────────────────────────────────────────────
-// System prompt
-// ─────────────────────────────────────────────────────────
-
-function buildSystemPrompt(
-  topic: string,
-  startDate: string,
-  endDate: string,
-  timeline: Array<{
-    date: string; psi: number; rho: number; q: number;
-    f: number; tau: number; lambda: number;
-    coherence: number; sourceCount: number;
-  }>,
-  poemSection: string,
-  factualContext: string,
-  domainConfig?: DomainConfig
-): string {
-  const dimRows = timeline
-    .map((d) =>
-      `${d.date} | Ψ=${d.psi?.toFixed(2)} ρ=${d.rho?.toFixed(2)} q=${d.q?.toFixed(2)} f=${d.f?.toFixed(2)} τ=${d.tau?.toFixed(2)} λ=${d.lambda?.toFixed(2)} | coherence=${d.coherence?.toFixed(2)} | sources=${d.sourceCount}`
-    )
-    .join("\n");
-
-  const factualSection = factualContext
-    ? `\nVERIFIED FACTUAL CONTEXT (web search — use this as ground truth):\n${factualContext}\n`
-    : "";
-
-  const domainLabel = domainConfig?.entity_label ?? "topic";
-  const domainName = domainConfig?.name ?? "General Analysis";
-  const domainQuestion = domainConfig?.domain_question ?? "How do different sources perceive the same events through different lenses?";
-
+function buildSystemPrompt(topic: string, startDate: string, endDate: string, contextBlock: string, factualContext: string, domainConfig?: DomainConfig): string {
+  const domainLabel = domainConfig?.entity_label ?? "entity";
+  const domainName = domainConfig?.name ?? "Rose Glass";
+  const domainQuestion = domainConfig?.domain_question ?? "How do different sources perceive the same subject through different lenses?";
+  const connector = domainConfig?.connector ?? "gdelt";
+  const isExternal = connector === "gdelt" || connector === "news";
+  const factualSection = factualContext ? `
+VERIFIED FACTUAL CONTEXT (web search — use as ground truth):
+${factualContext}
+` : "";
+  const dataNote = isExternal
+    ? "FACTS come from the web search layer. LENS comes from the dimensional data and poems."
+    : "The source data IS the factual layer — internal records. Ground all claims in source detail above. Do not supplement with outside knowledge unless explicitly asked.";
   return `You are Rose Glass — a translation layer between ${domainName} data and the analyst.
 
-The core question this deployment is answering:
-${domainQuestion}
+Core question: ${domainQuestion}
+Entity: ${topic} (${domainLabel}) | Range: ${startDate} to ${endDate} | Connector: ${connector}
 
-You are analyzing: ${topic} (${domainLabel})
-Date range: ${startDate} to ${endDate}
-
-You have two layers of information. Use them together:
-
-1. FACTUAL LAYER — verified facts from web/intranet search. This is ground truth. Never contradict it.
-2. LENS LAYER — witness poems showing HOW sources framed those facts through cultural lenses.
-
-The poems compress the lens, not the facts. Do not derive factual claims from poems alone.
-If a fact isn't in the factual layer, say you don't have it — do not construct it from poem imagery.
+${dataNote}
 ${factualSection}
-${poemSection}
-
-DIMENSIONAL SIGNAL (how sources covered it, averaged per day):
-${dimRows}
+${contextBlock}
 
 ROSE GLASS DIMENSIONS:
-  Ψ = internal consistency   ρ = accumulated wisdom
-  q = emotional activation   f = social/tribal framing
-  τ = temporal depth         λ = lens interference
+  Ψ = internal consistency | ρ = accumulated wisdom | q = emotional/moral activation
+  f = social/tribal framing | τ = temporal depth | λ = lens interference
 
 TRANSLATION PROTOCOL:
-- Facts come from the factual layer. Lens comes from the poems.
-- Use dimensional data to explain WHY lenses frame facts the way they do.
-- When lenses diverge on the same verified fact, that divergence IS the story.
-- High λ = cultural interpretation gap is itself significant information.
-- False positive is worse than silence. If you don't have it, say so.`;
+- High λ = cultural interpretation gap — name it explicitly
+- High divergence = sources are seeing different realities — translate why
+- Low veritas score = treat that source as lens, not fact
+- Calibration notes = analyst-provided context — weight accordingly
+- Poems compress the lens, not the facts — do not derive factual claims from poem imagery
+- False positive is worse than silence — if the data doesn't support it, say so
+- When sources disagree on a verified fact, that divergence IS the story`;
 }
-
-// ─────────────────────────────────────────────────────────
-// Route handler
-// ─────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { topic, startDate, endDate, timeline, message, history } = body;
-
+    const { topic, startDate, endDate, timeline, message, history, domainConfig } = body;
     if (!topic || !timeline || !message) {
-      return new Response(
-        JSON.stringify({ error: "topic, timeline, and message are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "topic, timeline, and message are required" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
-
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    if (!apiKey) return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), { status: 500, headers: { "Content-Type": "application/json" } });
 
-    // Run poems + web search in parallel
-    const [poems, factualContext] = await Promise.all([
-      fetchPoems(topic, startDate, endDate),
-      fetchFactualContext(topic, startDate, endDate, message, apiKey),
+    const connector = domainConfig?.connector ?? process.env.DATA_CONNECTOR ?? "gdelt";
+    const [sources, divergence, factualContext] = await Promise.all([
+      fetchSourceData(topic, startDate, endDate),
+      fetchDivergence(topic, startDate, endDate),
+      fetchFactualContext(topic, startDate, endDate, message, apiKey, connector),
     ]);
 
-    const poemSection = buildPoemSection(poems);
-    const systemPrompt = buildSystemPrompt(
-      topic, startDate, endDate, timeline, poemSection, factualContext
-    );
-
+    const contextBlock = buildContextBlock(sources, divergence, timeline);
+    const systemPrompt = buildSystemPrompt(topic, startDate, endDate, contextBlock, factualContext, domainConfig);
     const messages = [
-      ...(history || []).map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      ...(history||[]).map((m: {role:string;content:string}) => ({ role: m.role, content: m.content })),
       { role: "user", content: message },
     ];
 
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
-        stream: true,
-      }),
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1024, system: systemPrompt, messages, stream: true }),
     });
 
     if (!anthropicResponse.ok) {
       const errText = await anthropicResponse.text();
-      return new Response(
-        JSON.stringify({ error: "Anthropic request failed: " + errText }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Anthropic request failed: " + errText }), { status: 502, headers: { "Content-Type": "application/json" } });
     }
 
     const encoder = new TextEncoder();
@@ -260,63 +189,44 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         const reader = anthropicResponse.body?.getReader();
         if (!reader) { controller.close(); return; }
-
         const decoder = new TextDecoder();
         let buffer = "";
-
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
+            const lines = buffer.split("
+");
             buffer = lines.pop() || "";
-
             for (const line of lines) {
               const trimmed = line.trim();
               if (!trimmed || !trimmed.startsWith("data: ")) continue;
               const data = trimmed.slice(6);
               if (data === "[DONE]") continue;
-
               try {
                 const parsed = JSON.parse(data);
-                if (
-                  parsed.type === "content_block_delta" &&
-                  parsed.delta?.type === "text_delta" &&
-                  parsed.delta?.text
-                ) {
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ content: parsed.delta.text })}\n\n`)
-                  );
+                if (parsed.type==="content_block_delta" && parsed.delta?.type==="text_delta" && parsed.delta?.text) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: parsed.delta.text })}
+
+`));
                 }
-                if (parsed.type === "message_stop") {
-                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                }
-              } catch { /* skip malformed */ }
+                if (parsed.type==="message_stop") controller.enqueue(encoder.encode("data: [DONE]
+
+"));
+              } catch { /* skip */ }
             }
           }
-        } catch (err) {
-          console.error("[timeline-chat] stream error:", err);
-        } finally {
-          controller.close();
-        }
+        } catch (err) { console.error("[timeline-chat] stream error:", err); }
+        finally { controller.close(); }
       },
     });
 
     return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
     });
-
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
