@@ -52,14 +52,18 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const [varName, varDef] of varEntries as [string, CensusVariable][]) {
-      const concept = varDef.concept || "UNCATEGORIZED";
+      const concept = (varDef.concept || "UNCATEGORIZED").slice(0, 200);
       concepts.add(concept);
       const is_moe = moeNames.has(varName);
       const has_moe = !is_moe && moeNames.has(varName + "M");
       if (is_moe) moeCount++; else estimateCount++;
       processed.push({
-        name: varName, label: varDef.label || "", concept,
-        predicate_type: varDef.predicateType || "string", has_moe, is_moe,
+        name: varName,
+        label: (varDef.label || "").slice(0, 400),
+        concept,
+        predicate_type: varDef.predicateType || "string",
+        has_moe,
+        is_moe,
       });
     }
 
