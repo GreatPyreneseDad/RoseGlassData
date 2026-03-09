@@ -14,6 +14,16 @@ interface PoemRow {
   f: number; tau: number; lambda_val: number;
 }
 
+interface DomainConfig {
+  id: string;
+  name: string;
+  entity_label: string;
+  domain_question: string;
+  connector: string;
+  search_context: string | null;
+  deployment_tier: string;
+}
+
 // ─────────────────────────────────────────────────────────
 // Fetch poems
 // ─────────────────────────────────────────────────────────
@@ -25,7 +35,8 @@ async function fetchPoems(topic: string, startDate: string, endDate: string): Pr
               s.psi, s.rho, s.q, s.f, s.tau, s.lambda_val
        FROM sources s
        JOIN analyses a ON s.analysis_id = a.id
-       WHERE UPPER(a.topic) = UPPER($1)
+       JOIN entity_nodes n ON n.id = a.entity_node_id
+       WHERE UPPER(n.label) = UPPER($1)
          AND a.date BETWEEN $2::date AND $3::date
          AND s.poem IS NOT NULL
        ORDER BY a.date ASC, s.source_name ASC`,
@@ -138,11 +149,21 @@ function buildSystemPrompt(
     ? `\nVERIFIED FACTUAL CONTEXT (web search — use this as ground truth):\n${factualContext}\n`
     : "";
 
-  return `You are Rose Glass — a translation layer between news coverage and the reader.
+  const domainLabel = domainConfig?.entity_label ?? "topic";
+  const domainName = domainConfig?.name ?? "General Analysis";
+  const domainQuestion = domainConfig?.domain_question ?? "How do different sources perceive the same events through different lenses?";
+
+  return `You are Rose Glass — a translation layer between ${domainName} data and the analyst.
+
+The core question this deployment is answering:
+${domainQuestion}
+
+You are analyzing: ${topic} (${domainLabel})
+Date range: ${startDate} to ${endDate}
 
 You have two layers of information. Use them together:
 
-1. FACTUAL LAYER — verified facts from web search. This is ground truth. Never contradict it.
+1. FACTUAL LAYER — verified facts from web/intranet search. This is ground truth. Never contradict it.
 2. LENS LAYER — witness poems showing HOW sources framed those facts through cultural lenses.
 
 The poems compress the lens, not the facts. Do not derive factual claims from poems alone.
