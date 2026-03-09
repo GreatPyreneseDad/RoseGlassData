@@ -40,7 +40,7 @@ function EntryGate({ onEnter }: { onEnter: () => void }) {
         </div>
 
         <h1 className="entry-title">Rose Glass</h1>
-        <p className="entry-subtitle">Dimensional News Analysis</p>
+        <p className="entry-subtitle">Dimensional Intelligence Analysis</p>
 
         <div className="entry-divider" />
 
@@ -82,7 +82,7 @@ function EntryGate({ onEnter }: { onEnter: () => void }) {
         </button>
 
         <p className="entry-footnote">
-          Powered by GDELT · Rose Glass v2 · IPAI Engine
+          Rose Glass v2 · IPAI Engine
         </p>
       </div>
 
@@ -296,7 +296,7 @@ export default function Home() {
         const errData = await res.json();
         const msg = errData.error || `HTTP ${res.status}`;
         if (res.status === 404 || msg.includes("No articles")) {
-          throw new Error("No international coverage found for this topic on this date. Rose Glass runs on GDELT, which indexes global news sources. Try a geopolitical topic (country, conflict, policy) or a different date.");
+          throw new Error("No international coverage found for this topic on this date. No data found for this entity on this date.");
         }
         throw new Error(msg);
       }
@@ -612,7 +612,7 @@ export default function Home() {
             <div className="obs-logo-dot" />
             <div>
               <div className="obs-logo-name">Rose Glass</div>
-              <div className="obs-logo-sub">News Observatory</div>
+              <div className="obs-logo-sub">Rose Glass Observatory</div>
             </div>
           </div>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", letterSpacing: "0.2em", color: "#2d3748", textTransform: "uppercase" }}>
@@ -682,7 +682,7 @@ export default function Home() {
             <span className="obs-loading-text">
               {tab === "timeline" ? "Building timeline across date range..." :
                 loadingStage === "checking" ? "Checking observatory cache..." :
-                loadingStage === "fetching" ? "Querying GDELT — global coverage, first fetch ~30s..." :
+                loadingStage === "fetching" ? "Querying sources — first fetch ~30s..." :
                 "Running Rose Glass dimensional analysis..."}
             </span>
           </div>
