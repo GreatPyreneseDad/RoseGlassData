@@ -42,6 +42,7 @@ const STARTERS = [
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [stage, setStage] = useState<"home" | "connecting" | "chat">("home");
+  const [hasKey, setHasKey] = useState<boolean>(true);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<ConnectResult | null>(null);
@@ -59,6 +60,9 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const key = getApiKey();
+    setHasKey(!!key);
+    if (!key) return;
     fetch("/api/sessions", { headers: apiHeaders() }).then(r => r.json()).then(d => setSessions(d.sessions || []));
   }, []);
 
@@ -241,7 +245,9 @@ export default function Home() {
         <div className="rg-mark">Rose Glass</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <div className="rg-tag">Translation · Not Judgment</div>
-          <a href="/dashboard" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: "#3a3f50", textDecoration: "none", transition: "color 0.15s" }}>Account</a>
+          <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#3a3f50" : "#c8a96e", textDecoration: "none", border: hasKey ? "none" : "1px solid rgba(200,169,110,0.35)", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>
+            {hasKey ? "Account" : "Sign In · Register"}
+          </a>
         </div>
       </header>
 
@@ -249,6 +255,18 @@ export default function Home() {
         <div className="home">
           <h1 className="home-lede">What does this database <em>believe</em><br />about the world it measures?</h1>
           <p className="home-sub">Connect a public dataset or upload your own. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts.</p>
+          {!hasKey && (
+            <div style={{ background: "rgba(200,169,110,0.04)", border: "1px solid rgba(200,169,110,0.2)", padding: "1.5rem 2rem", marginBottom: "2.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.1rem", color: "#d4c8a0", marginBottom: "0.3rem" }}>Create a free account to get started</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#3a3f50", letterSpacing: "0.1em", lineHeight: 1.7 }}>10,000 free tokens · no credit card required · upgrade anytime</div>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <a href="/login?tab=signup" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid #c8a96e", color: "#c8a96e", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Create account</a>
+                <a href="/login" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid rgba(180,150,90,0.2)", color: "#5a6070", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Sign in</a>
+              </div>
+            </div>
+          )}
           {connectError && <div className="err">{connectError}</div>}
 
           <div className="tab-row">
