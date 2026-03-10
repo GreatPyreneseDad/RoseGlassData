@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { Pool } from "pg";
+import { checkAuth, withTokenHeaders } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Infer Rose Glass concept from Postgres column info
 function inferConcept(tableName: string, colName: string, dataType: string): string {
   const n = (tableName + " " + colName).toLowerCase();
   if (/age|dob|birth|born/.test(n)) return "AGE AND SEX";
@@ -34,18 +34,19 @@ function inferConcept(tableName: string, colName: string, dataType: string): str
 export async function POST(request: NextRequest) {
   let userPool: Pool | null = null;
   try {
+    // Auth gate — same pattern as connect + upload
+    const auth = await checkAuth(request, "db_connect");
+    if (auth instanceof NextResponse) return auth;
+
     const { connection_string, name } = await request.json();
     if (!connection_string) return NextResponse.json({ error: "connection_string required" }, { status: 400 });
 
-    // Validate it looks like a postgres URL
     if (!connection_string.startsWith("postgres://") && !connection_string.startsWith("postgresql://"))
       return NextResponse.json({ error: "Must be a PostgreSQL connection string (postgres://...)" }, { status: 400 });
 
-    // Connect to user's DB
     userPool = new Pool({ connectionString: connection_string, connectionTimeoutMillis: 10_000, max: 1 });
     const client = await userPool.connect();
 
-    // Introspect schema
     const schemaRes = await client.query(`
       SELECT table_name, column_name, data_type, is_nullable, column_default
       FROM information_schema.columns
@@ -57,7 +58,6 @@ export async function POST(request: NextRequest) {
     if (schemaRes.rows.length === 0)
       return NextResponse.json({ error: "No tables found in public schema" }, { status: 400 });
 
-    // Build variable manifest
     const tables = new Map<string, typeof schemaRes.rows>();
     for (const row of schemaRes.rows) {
       if (!tables.has(row.table_name)) tables.set(row.table_name, []);
@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
     const conceptList = Array.from(concepts);
     const tableNames = Array.from(tables.keys());
 
-    // Rose Glass scoring
     const contested = ["RACE AND ETHNICITY","POVERTY AND ASSISTANCE","CRIMINAL JUSTICE",
       "MENTAL HEALTH AND SUBSTANCE USE","INCOME","EMPLOYMENT STATUS"];
     const hits = contested.filter(t => conceptList.includes(t)).length;
@@ -99,29 +98,26 @@ export async function POST(request: NextRequest) {
     const f = conceptList.includes("HOUSEHOLD AND FAMILY") ? 0.45 : 0.6;
     const tau = conceptList.includes("TEMPORAL") ? 0.72 : 0.45;
     const lambda = Math.min(0.9, 0.3 + hits * 0.07);
-    const moe_coverage = 0;
 
-    // Absences
     const absences: Array<{ domain: string; absence: string; significance: string }> = [];
     if (conceptList.includes("INCOME") && !conceptList.includes("HOUSING"))
       absences.push({ domain: "Economic", absence: "Housing cost burden", significance: "Income tracked without housing cost — economic pressure invisible" });
     if (conceptList.includes("HEALTH AND DISABILITY") && !conceptList.includes("MENTAL HEALTH AND SUBSTANCE USE"))
-      absences.push({ domain: "Health", absence: "Mental health dimensions", significance: "Physical health tracked; psychological health absent — common in clinical systems built around billing codes" });
+      absences.push({ domain: "Health", absence: "Mental health dimensions", significance: "Physical health tracked; psychological health absent" });
     if (!conceptList.includes("QUALITATIVE"))
       absences.push({ domain: "Voice", absence: "Narrative and free-text data", significance: "No column captures what a person would say in their own words" });
     if (!conceptList.includes("TEMPORAL"))
       absences.push({ domain: "Time", absence: "Temporal dimension", significance: "No timestamps detected — change over time is invisible" });
 
-    // Lens summary
-    const lens_summary = `A relational database with ${tableNames.length} table${tableNames.length > 1 ? "s" : ""} (${tableNames.join(", ")}). ${hits > 2 ? "The schema tracks contested social categories — built by someone who needed to see who people are, not just what they do." : "The schema is primarily operational — tracking transactions and states rather than people."} ${conceptList.includes("ASSESSMENT AND SCORING") ? "Scoring variables suggest an evaluative frame: people are measured against standards." : ""} Connection string used in-flight only — no credentials stored.`;
+    const lens_summary = `A relational database with ${tableNames.length} table${tableNames.length > 1 ? "s" : ""} (${tableNames.join(", ")}). ${hits > 2 ? "The schema tracks contested social categories." : "The schema is primarily operational."} ${conceptList.includes("ASSESSMENT AND SCORING") ? "Scoring variables suggest an evaluative frame." : ""} Connection string used in-flight only — no credentials stored.`;
 
     const db = getDB();
     const sessionRes = await db.query(
-      `INSERT INTO db_sessions (name, connector, dataset_id, vintage, endpoint_url, profiled_at, variable_count, concept_count, geography_depth)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8) RETURNING id`,
+      `INSERT INTO db_sessions (name, connector, dataset_id, vintage, endpoint_url, profiled_at, variable_count, concept_count, geography_depth, api_key_id)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9) RETURNING id`,
       [name || `PostgreSQL: ${tableNames.slice(0,3).join(", ")}`, "postgres",
        tableNames.join(","), new Date().getFullYear(),
-       `postgres:${tableNames.join(",")}`, processed.length, conceptList.length, []]
+       `postgres:${tableNames.join(",")}`, processed.length, conceptList.length, [], auth.api_key_id]
     );
     const sessionId = sessionRes.rows[0].id;
 
@@ -136,10 +132,10 @@ export async function POST(request: NextRequest) {
     await db.query(
       `INSERT INTO rg_profiles (session_id,psi,rho,q,f,tau,lambda,absences,moe_coverage,suppression_rate,lens_summary)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (session_id) DO NOTHING`,
-      [sessionId, psi, rho, q, f, tau, lambda, JSON.stringify(absences), moe_coverage, 0, lens_summary]
+      [sessionId, psi, rho, q, f, tau, lambda, JSON.stringify(absences), 0, 0, lens_summary]
     );
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       session_id: sessionId,
       name: name || `PostgreSQL: ${tableNames.slice(0,3).join(", ")}`,
       variable_count: processed.length,
@@ -147,14 +143,16 @@ export async function POST(request: NextRequest) {
       moe_coverage: 0,
       geographies: [],
       tables: tableNames,
+      tokens_remaining: auth.tokens_remaining,
       profile: { absences, lens_summary },
     });
+    return withTokenHeaders(response, auth);
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[db-connect]", message);
     if (message.includes("ECONNREFUSED") || message.includes("timeout"))
-      return NextResponse.json({ error: "Could not connect to database. Check the connection string and ensure the host is reachable." }, { status: 502 });
+      return NextResponse.json({ error: "Could not connect to database. Check the connection string." }, { status: 502 });
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     if (userPool) await userPool.end().catch(() => {});

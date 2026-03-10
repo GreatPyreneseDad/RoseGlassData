@@ -1,6 +1,15 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 
+function getApiKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("rgd_api_key") || "";
+}
+function apiHeaders(extra?: Record<string, string>): Record<string, string> {
+  const key = getApiKey();
+  return { ...(key ? { "X-Api-Key": key } : {}), ...extra };
+}
+
 type Session = {
   id: string; name: string; dataset_id: string; vintage: number;
   variable_count: number; concept_count: number; moe_coverage: number;
@@ -50,7 +59,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/sessions").then(r => r.json()).then(d => setSessions(d.sessions || []));
+    fetch("/api/sessions", { headers: apiHeaders() }).then(r => r.json()).then(d => setSessions(d.sessions || []));
   }, []);
 
   useEffect(() => {
@@ -61,7 +70,7 @@ export default function Home() {
     setConnecting(true); setConnectError(null); setStage("connecting");
     try {
       const res = await fetch("/api/connect", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ dataset_id, vintage, name }),
       });
       const data = await res.json();
@@ -78,7 +87,7 @@ export default function Home() {
     try {
       const form = new FormData();
       form.append("file", uploadFile);
-      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const res = await fetch("/api/upload", { method: "POST", headers: apiHeaders(), body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
       openSession(data, uploadFile.name.replace(/\.[^.]+$/, ""));
@@ -92,7 +101,7 @@ export default function Home() {
     setConnecting(true); setConnectError(null); setStage("connecting");
     try {
       const res = await fetch("/api/db-connect", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ connection_string: dbString, name: dbName || undefined }),
       });
       const data = await res.json();
@@ -109,7 +118,7 @@ export default function Home() {
     const tableNote = data.tables ? ` in ${data.tables.length} table${data.tables.length > 1 ? "s" : ""}` : "";
     setMessages([{ role: "assistant", content: `I've read the structure of **${data.name || name}**.\n\n${data.variable_count.toLocaleString()} variables across ${data.concept_count} concept domains${rowNote}${tableNote}. What do you want to understand about it?` }]);
     setStage("chat");
-    fetch("/api/sessions").then(r => r.json()).then(d => setSessions(d.sessions || []));
+    fetch("/api/sessions", { headers: apiHeaders() }).then(r => r.json()).then(d => setSessions(d.sessions || []));
   }
 
   async function sendMessage() {
@@ -119,7 +128,7 @@ export default function Home() {
     setSending(true);
     try {
       const res = await fetch("/api/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ session_id: activeSession.session_id, message: userMsg }),
       });
       const data = await res.json();
@@ -230,7 +239,10 @@ export default function Home() {
       <style>{CSS}</style>
       <header className="rg-header">
         <div className="rg-mark">Rose Glass</div>
-        <div className="rg-tag">Translation · Not Judgment</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          <div className="rg-tag">Translation · Not Judgment</div>
+          <a href="/dashboard" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: "#3a3f50", textDecoration: "none", transition: "color 0.15s" }}>Account</a>
+        </div>
       </header>
 
       {stage === "home" && (

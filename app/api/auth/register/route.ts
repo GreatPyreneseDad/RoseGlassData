@@ -1,31 +1,42 @@
 // app/api/auth/register/route.ts
-// Generate a trial API key for a new user.
-// POST { email } → { api_key, tokens_remaining, plan }
-// No password — key IS the credential. User stores it.
+// Called after Supabase Auth confirms email.
+// Returns the api_key for the authenticated user.
+// POST with Supabase session token → { api_key, tokens_remaining, plan }
 
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { getDB } from "@/lib/db";
 import { generateApiKey } from "@/lib/auth";
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    // Validate Supabase session token from Authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
 
-    if (!email || !email.includes("@")) {
-      return NextResponse.json(
-        { error: "Valid email required." },
-        { status: 400 }
-      );
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
     const db = getDB();
+    const email = user.email?.toLowerCase().trim() || "";
 
-    // Check if email already has an active key
+    // Return existing key if present
     const existing = await db.query(
       `SELECT key, tokens_remaining, plan FROM api_keys
-       WHERE email = $1 AND is_active = TRUE
+       WHERE user_id = $1 AND is_active = TRUE
        ORDER BY created_at DESC LIMIT 1`,
-      [email.toLowerCase().trim()]
+      [user.id]
     );
 
     if (existing.rows.length > 0) {
@@ -34,31 +45,27 @@ export async function POST(request: NextRequest) {
         api_key: row.key,
         tokens_remaining: row.tokens_remaining,
         plan: row.plan,
-        note: "Existing key returned. Store it — we don't show it again.",
       });
     }
 
     // Issue new trial key
     const key = generateApiKey();
-    const TRIAL_TOKENS = 10000;
-
     await db.query(
-      `INSERT INTO api_keys (key, email, plan, tokens_remaining)
-       VALUES ($1, $2, 'trial', $3)`,
-      [key, email.toLowerCase().trim(), TRIAL_TOKENS]
+      `INSERT INTO api_keys (key, email, plan, tokens_remaining, user_id)
+       VALUES ($1, $2, 'trial', 10000, $3)`,
+      [key, email, user.id]
     );
 
     return NextResponse.json({
       api_key: key,
-      tokens_remaining: TRIAL_TOKENS,
+      tokens_remaining: 10000,
       plan: "trial",
       token_costs: {
-        upload: "2,000 tokens — full 7-agent semantic profile",
-        chat: "100 tokens — per message",
-        connect: "500 tokens — Census or Postgres schema profiling",
+        upload: "2,000 tokens",
+        chat: "100 tokens per message",
+        connect: "500 tokens",
+        db_connect: "500 tokens",
       },
-      note: "Store this key — it will not be shown again.",
-      docs: "https://rose-glass-data.vercel.app/docs",
     });
 
   } catch (error: unknown) {
