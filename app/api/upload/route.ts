@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "csv") return NextResponse.json({ error: "Only CSV files supported currently" }, { status: 400 });
 
-    const MAX_MB = 50;
+    const MAX_MB = 4;
     if (file.size > MAX_MB * 1024 * 1024)
       return NextResponse.json({ error: `File too large. Max ${MAX_MB}MB.` }, { status: 400 });
 
