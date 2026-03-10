@@ -176,7 +176,7 @@ export default function DashboardPage() {
                     {upgrading ? "Redirecting…" : "Upgrade to Pro →"}
                   </button>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#3a3f50" }}>
-                    Unlimited tokens · $29/month
+                    Unlimited tokens · $4/month
                   </span>
                 </div>
               </>

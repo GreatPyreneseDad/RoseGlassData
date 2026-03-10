@@ -138,8 +138,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-import type { DatasetProfile } from "@/lib/coherence-graph";
-
 function buildSemanticSection(profile: DatasetProfile): string {
   if (!profile) return "";
   const highProxy = profile.semantic_columns
