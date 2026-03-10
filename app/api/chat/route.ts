@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { queryCensus, resolveStateFips, SampleResult } from "@/lib/census-sampler";
+import type { DatasetProfile, SemanticColumn } from "@/lib/coherence-graph";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -34,41 +35,35 @@ function detectTopicAndState(message: string): { topic: string | null; state: st
   }
   let state: string | null = null;
   const lower = message.toLowerCase();
-  const twoWord = STATE_NAMES.filter(s => s.includes(" "));
-  const oneWord = STATE_NAMES.filter(s => !s.includes(" "));
-  for (const s of [...twoWord, ...oneWord]) {
+  for (const s of [...STATE_NAMES.filter(s => s.includes(" ")), ...STATE_NAMES.filter(s => !s.includes(" "))]) {
     if (lower.includes(s)) { state = s; break; }
   }
   return { topic, state };
 }
 
-// Extract CSV sample data from endpoint_url for non-census sessions
 function extractCSVSample(endpointUrl: string): { headers: string[]; rows: string[][] } | null {
   if (!endpointUrl?.startsWith("csv_data:")) return null;
-  try {
-    const json = endpointUrl.slice("csv_data:".length);
-    return JSON.parse(json);
-  } catch { return null; }
+  try { return JSON.parse(endpointUrl.slice("csv_data:".length)); }
+  catch { return null; }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const { session_id, message } = await request.json();
-    if (!session_id || !message) {
+    if (!session_id || !message)
       return NextResponse.json({ error: "session_id and message required" }, { status: 400 });
-    }
 
     const db = getDB();
     const sessionRes = await db.query(
       `SELECT s.*, p.psi, p.rho, p.q, p.f, p.tau, p.lambda,
-              p.absences, p.moe_coverage, p.lens_summary
+              p.absences, p.moe_coverage, p.lens_summary, p.semantic_profile
        FROM db_sessions s LEFT JOIN rg_profiles p ON p.session_id = s.id
        WHERE s.id = $1`,
       [session_id]
     );
-    if (sessionRes.rows.length === 0) {
+    if (sessionRes.rows.length === 0)
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
+
     const session = sessionRes.rows[0];
 
     const [conceptsRes, histRes] = await Promise.all([
@@ -83,24 +78,32 @@ export async function POST(request: NextRequest) {
       )
     ]);
 
-    // Branch: Census gets live API queries; CSV/Postgres gets sample data from session
     let sampleData: SampleResult | null = null;
     let csvSample: { headers: string[]; rows: string[][] } | null = null;
 
     if (session.connector === "census" || !session.connector) {
-      const { topic: detectedTopic, state: detectedState } = detectTopicAndState(message);
-      if (detectedTopic) {
-        const stateFips = detectedState ? resolveStateFips(detectedState) : undefined;
-        sampleData = await queryCensus(session.dataset_id, session.vintage, detectedTopic, stateFips);
+      const { topic, state } = detectTopicAndState(message);
+      if (topic) {
+        const fips = state ? resolveStateFips(state) : undefined;
+        sampleData = await queryCensus(session.dataset_id, session.vintage, topic, fips);
       }
     } else if (session.connector === "csv") {
       csvSample = extractCSVSample(session.endpoint_url);
     }
 
-    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData, csvSample);
+    // Parse semantic profile if present
+    let semanticProfile: DatasetProfile | null = null;
+    if (session.semantic_profile) {
+      try { semanticProfile = typeof session.semantic_profile === "string"
+        ? JSON.parse(session.semantic_profile)
+        : session.semantic_profile;
+      } catch { /* ignore parse failure */ }
+    }
+
+    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData, csvSample, semanticProfile);
 
     await db.query(
-      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1,$2,$3)`,
       [session_id, "user", message]
     );
 
@@ -116,32 +119,62 @@ export async function POST(request: NextRequest) {
 
     const reply = response.content[0].type === "text" ? response.content[0].text : "";
     await db.query(
-      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1,$2,$3)`,
       [session_id, "assistant", reply]
     );
 
     return NextResponse.json({ reply });
 
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[chat]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[chat]", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+function buildSemanticSection(profile: DatasetProfile): string {
+  if (!profile) return "";
+
+  const highProxy = profile.semantic_columns
+    .filter(c => c.proxy_risk === "high" || c.proxy_risk === "moderate")
+    .map(c => `  ${c.column} (${c.proxy_risk}): ${c.proxy_risk_note}`)
+    .join("\n");
+
+  const composites = profile.semantic_columns
+    .filter(c => c.semantic_type === "composite")
+    .map(c => `  ${c.column}: ${c.lineage_note}`)
+    .join("\n");
+
+  const suppressed = profile.semantic_columns
+    .filter(c => c.null_semantics === "suppressed" || c.null_semantics === "ambiguous")
+    .map(c => `  ${c.column} (${c.null_semantics})`)
+    .join("\n");
+
+  const limitations = profile.use_limitations.map(l => `  - ${l}`).join("\n");
+
+  return `
+SEMANTIC PROFILE (produced by pre-processing analysis):
+Grain: ${profile.grain}
+Dataset class: ${profile.dataset_class}
+Analytical scope: ${profile.analytical_scope}
+
+Use limitations:
+${limitations}
+${highProxy ? `\nProxy risk (moderate/high — relevant for any modeling or scoring use):\n${highProxy}` : ""}
+${composites ? `\nComposite fields (encode multiple concepts — interpret carefully):\n${composites}` : ""}
+${suppressed ? `\nSuppressed or ambiguous nulls (do not treat as "not applicable"):\n${suppressed}` : ""}`;
 }
 
 function buildSystemPrompt(
   session: Record<string, unknown>,
   concepts: Array<{ concept: string; count: string; moe_count: string }>,
   sampleData: SampleResult | null,
-  csvSample: { headers: string[]; rows: string[][] } | null
+  csvSample: { headers: string[]; rows: string[][] } | null,
+  semanticProfile: DatasetProfile | null
 ): string {
   const absences = (session.absences as Array<{ domain: string; absence: string; significance: string }>) || [];
-  const topConcepts = concepts.slice(0, 20)
-    .map(c => `  ${c.concept} (${c.count} variables)`)
-    .join("\n");
-  const absenceList = absences
-    .map(a => `  [${a.domain}] ${a.absence}: ${a.significance}`)
-    .join("\n");
+  const topConcepts = concepts.slice(0, 20).map(c => `  ${c.concept} (${c.count} variables)`).join("\n");
+  const absenceList = absences.map(a => `  [${a.domain}] ${a.absence}: ${a.significance}`).join("\n");
 
   const psi = Number(session.psi) || 0.5;
   const q = Number(session.q) || 0.5;
@@ -153,7 +186,7 @@ function buildSystemPrompt(
 
   let dataSection = "";
 
-  if (sampleData && sampleData.rows.length > 0) {
+  if (sampleData?.rows.length) {
     const rowSummary = sampleData.rows.map(r => {
       const name = r["NAME"] || "?";
       const rate = r["_rate"] ? `${r["_rate"]}` : "";
@@ -165,49 +198,52 @@ function buildSystemPrompt(
     dataSection = `\nLIVE DATA — USE THESE EXACT VALUES:\n${sampleData.query_description}\n${sampleData.note ? `(${sampleData.note})` : ""}\n${rowSummary}\n\nDo not hedge. Do not approximate. Use what is above.\n`;
   }
 
-  if (csvSample && csvSample.headers.length > 0) {
+  if (csvSample?.headers.length) {
     const header = csvSample.headers.join(" | ");
     const sampleRows = csvSample.rows.slice(0, 10)
       .map(r => r.map((v, i) => csvSample.headers[i] ? `${csvSample.headers[i]}: ${v}` : v).join(", "))
       .join("\n  ");
-    dataSection = `\nSAMPLE DATA (first 10 rows of ${session.name}):\nColumns: ${header}\n\n  ${sampleRows}\n\nYou can reason directly from these values. When the user asks a question answerable from the data, use it.\n`;
+    dataSection = `\nSAMPLE DATA (first 10 rows of ${session.name}):\nColumns: ${header}\n\n  ${sampleRows}\n\nReason directly from these values when answering questions about the data.\n`;
   }
 
   const connectorNote = connector === "csv"
-    ? "This is a user-uploaded CSV file. You have access to sample data above."
+    ? "User-uploaded CSV file."
     : connector === "postgres"
-    ? "This is a user-connected PostgreSQL database. You see the schema structure; live queries would require database access."
-    : "This is a US Census Bureau public API dataset.";
+    ? "User-connected PostgreSQL database. Schema only — live queries require database access."
+    : "US Census Bureau public API dataset.";
 
-  return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
+  const semanticSection = semanticProfile ? buildSemanticSection(semanticProfile) : "";
+
+  return `You are a data intelligence analyst. You have read this dataset completely.
 
 DATASET: ${session.name}
-CONNECTOR: ${connector.toUpperCase()} — ${connectorNote}
+SOURCE: ${connector.toUpperCase()} — ${connectorNote}
 VARIABLES: ${session.variable_count} across ${session.concept_count} concept domains
 ${connector === "census" ? `GEOGRAPHIES: ${(session.geography_depth as string[] || []).join(", ")}` : ""}
 
-WHAT THIS DATA MEASURES:
+CONCEPT DOMAINS:
 ${topConcepts}
 
-WHAT IT DOES NOT MEASURE:
+STRUCTURAL GAPS:
 ${absenceList}
 
-HOW IT WAS BUILT:
+BUILDER'S LENS:
 ${session.lens_summary}
+${semanticSection}
 ${dataSection}
-YOUR READING POSTURE — internalize, never quote:
-${psi > 0.7 ? "- Framework is internally coherent." : "- Framework has internal gaps. Be careful about cross-referencing."}
-${q > 0.6 ? "- Contested categories present. Name the contestedness when relevant." : "- Categories appear neutral. Look for what has been naturalized."}
-${lambda > 0.6 ? "- High worldview interference: the measurer's assumptions are baked deep into the structure." : "- Moderate worldview interference."}
-${tau > 0.7 ? "- Meaningful temporal depth. You can speak to trends." : "- Limited temporal depth. Be careful about trend claims."}
-${f < 0.5 ? "- Household or aggregate is the unit. Individual experience is flattened." : "- Individual-level data available."}
-${moe > 60 ? `- ${moe}% error margin coverage.` : `- Only ${moe}% error margin coverage — uncertainty is largely undocumented.`}
+READING POSTURE — internalize, never surface:
+${psi > 0.7 ? "- Internal structure is coherent." : "- Internal gaps present — cross-referencing requires care."}
+${q > 0.6 ? "- Contested categories present. Name the contestedness when it matters." : "- Categories appear neutral — look for what has been naturalized."}
+${lambda > 0.6 ? "- Measurer's assumptions are deep in the structure." : "- Moderate interpretive load."}
+${tau > 0.7 ? "- Temporal depth available — trend claims are supportable." : "- Limited temporal depth — be careful with trends."}
+${f < 0.5 ? "- Aggregate unit of analysis — individual experience is flattened." : "- Individual-level resolution available."}
+${moe > 60 ? `- ${moe}% uncertainty documented.` : `- Only ${moe}% uncertainty documented — confidence intervals largely absent.`}
 
 PRINCIPLES:
-- When you have actual data above, use it. Specific values. Named rows. No approximation.
-- Translation, not judgment. Surface what is there and what is absent.
-- If something is not in the profile or sample, say so. Don't construct from silence.
-- Never mention Rose Glass, dimensional scores, or framework names.
-- Plain language. No academic hedging. No "it is important to note."
+- When you have actual data, use it. Specific values. Named rows. No approximation.
+- Surface what is there and what is absent. Translation, not judgment.
+- Proxy risk fields: name the risk when a user is considering modeling or scoring use.
+- If something isn't in the profile, say so. Don't construct from silence.
+- Plain language. No academic hedging.
 - False confidence is worse than acknowledged uncertainty.`;
 }
