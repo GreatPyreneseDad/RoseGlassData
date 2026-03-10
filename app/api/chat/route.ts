@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { queryCensus, resolveStateFips, SampleResult } from "@/lib/census-sampler";
-import type { DatasetProfile, SemanticColumn } from "@/lib/coherence-graph";
+import type { DatasetProfile } from "@/lib/coherence-graph";
+import { checkAuth, withTokenHeaders } from "@/lib/auth";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -49,17 +50,22 @@ function extractCSVSample(endpointUrl: string): { headers: string[]; rows: strin
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await checkAuth(request, "chat");
+    if (auth instanceof NextResponse) return auth;
+
     const { session_id, message } = await request.json();
     if (!session_id || !message)
       return NextResponse.json({ error: "session_id and message required" }, { status: 400 });
 
     const db = getDB();
+
+    // Verify session belongs to this API key
     const sessionRes = await db.query(
       `SELECT s.*, p.psi, p.rho, p.q, p.f, p.tau, p.lambda,
               p.absences, p.moe_coverage, p.lens_summary, p.semantic_profile
        FROM db_sessions s LEFT JOIN rg_profiles p ON p.session_id = s.id
-       WHERE s.id = $1`,
-      [session_id]
+       WHERE s.id = $1 AND (s.api_key_id = $2 OR s.api_key_id IS NULL)`,
+      [session_id, auth.api_key_id]
     );
     if (sessionRes.rows.length === 0)
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -91,13 +97,12 @@ export async function POST(request: NextRequest) {
       csvSample = extractCSVSample(session.endpoint_url);
     }
 
-    // Parse semantic profile if present
     let semanticProfile: DatasetProfile | null = null;
     if (session.semantic_profile) {
-      try { semanticProfile = typeof session.semantic_profile === "string"
-        ? JSON.parse(session.semantic_profile)
-        : session.semantic_profile;
-      } catch { /* ignore parse failure */ }
+      try {
+        semanticProfile = typeof session.semantic_profile === "string"
+          ? JSON.parse(session.semantic_profile) : session.semantic_profile;
+      } catch { /* ignore */ }
     }
 
     const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData, csvSample, semanticProfile);
@@ -107,7 +112,7 @@ export async function POST(request: NextRequest) {
       [session_id, "user", message]
     );
 
-    const response = await anthropic.messages.create({
+    const aiResponse = await anthropic.messages.create({
       model: "claude-opus-4-5-20251101",
       max_tokens: 1024,
       system: systemPrompt,
@@ -117,13 +122,14 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    const reply = response.content[0].type === "text" ? response.content[0].text : "";
+    const reply = aiResponse.content[0].type === "text" ? aiResponse.content[0].text : "";
     await db.query(
       `INSERT INTO chat_messages (session_id, role, content) VALUES ($1,$2,$3)`,
       [session_id, "assistant", reply]
     );
 
-    return NextResponse.json({ reply });
+    const response = NextResponse.json({ reply, tokens_remaining: auth.tokens_remaining });
+    return withTokenHeaders(response, auth);
 
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
@@ -132,37 +138,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
+import type { DatasetProfile } from "@/lib/coherence-graph";
+
 function buildSemanticSection(profile: DatasetProfile): string {
   if (!profile) return "";
-
   const highProxy = profile.semantic_columns
     .filter(c => c.proxy_risk === "high" || c.proxy_risk === "moderate")
     .map(c => `  ${c.column} (${c.proxy_risk}): ${c.proxy_risk_note}`)
     .join("\n");
-
   const composites = profile.semantic_columns
     .filter(c => c.semantic_type === "composite")
     .map(c => `  ${c.column}: ${c.lineage_note}`)
     .join("\n");
-
   const suppressed = profile.semantic_columns
     .filter(c => c.null_semantics === "suppressed" || c.null_semantics === "ambiguous")
     .map(c => `  ${c.column} (${c.null_semantics})`)
     .join("\n");
-
   const limitations = profile.use_limitations.map(l => `  - ${l}`).join("\n");
-
-  return `
-SEMANTIC PROFILE (produced by pre-processing analysis):
+  return `SEMANTIC PROFILE:
 Grain: ${profile.grain}
 Dataset class: ${profile.dataset_class}
 Analytical scope: ${profile.analytical_scope}
-
 Use limitations:
-${limitations}
-${highProxy ? `\nProxy risk (moderate/high — relevant for any modeling or scoring use):\n${highProxy}` : ""}
-${composites ? `\nComposite fields (encode multiple concepts — interpret carefully):\n${composites}` : ""}
-${suppressed ? `\nSuppressed or ambiguous nulls (do not treat as "not applicable"):\n${suppressed}` : ""}`;
+${limitations}${highProxy ? `\nProxy risk (moderate/high):\n${highProxy}` : ""}${composites ? `\nComposite fields:\n${composites}` : ""}${suppressed ? `\nSuppressed/ambiguous nulls:\n${suppressed}` : ""}`;
 }
 
 function buildSystemPrompt(
@@ -175,7 +173,6 @@ function buildSystemPrompt(
   const absences = (session.absences as Array<{ domain: string; absence: string; significance: string }>) || [];
   const topConcepts = concepts.slice(0, 20).map(c => `  ${c.concept} (${c.count} variables)`).join("\n");
   const absenceList = absences.map(a => `  [${a.domain}] ${a.absence}: ${a.significance}`).join("\n");
-
   const psi = Number(session.psi) || 0.5;
   const q = Number(session.q) || 0.5;
   const f = Number(session.f) || 0.5;
@@ -185,7 +182,6 @@ function buildSystemPrompt(
   const connector = (session.connector as string) || "census";
 
   let dataSection = "";
-
   if (sampleData?.rows.length) {
     const rowSummary = sampleData.rows.map(r => {
       const name = r["NAME"] || "?";
@@ -195,23 +191,19 @@ function buildSystemPrompt(
         ? ` of ${r[sampleData.variables[0]]} total` : "";
       return `  ${name}: ${rate}${count}${total}`;
     }).join("\n");
-    dataSection = `\nLIVE DATA — USE THESE EXACT VALUES:\n${sampleData.query_description}\n${sampleData.note ? `(${sampleData.note})` : ""}\n${rowSummary}\n\nDo not hedge. Do not approximate. Use what is above.\n`;
+    dataSection = `\nLIVE DATA:\n${sampleData.query_description}\n${rowSummary}\n`;
   }
-
   if (csvSample?.headers.length) {
     const header = csvSample.headers.join(" | ");
     const sampleRows = csvSample.rows.slice(0, 10)
-      .map(r => r.map((v, i) => csvSample.headers[i] ? `${csvSample.headers[i]}: ${v}` : v).join(", "))
+      .map(r => r.map((v, i) => `${csvSample.headers[i]}: ${v}`).join(", "))
       .join("\n  ");
-    dataSection = `\nSAMPLE DATA (first 10 rows of ${session.name}):\nColumns: ${header}\n\n  ${sampleRows}\n\nReason directly from these values when answering questions about the data.\n`;
+    dataSection = `\nSAMPLE DATA:\nColumns: ${header}\n\n  ${sampleRows}\n`;
   }
 
-  const connectorNote = connector === "csv"
-    ? "User-uploaded CSV file."
-    : connector === "postgres"
-    ? "User-connected PostgreSQL database. Schema only — live queries require database access."
-    : "US Census Bureau public API dataset.";
-
+  const connectorNote = connector === "csv" ? "User-uploaded CSV."
+    : connector === "postgres" ? "PostgreSQL database."
+    : "US Census Bureau API dataset.";
   const semanticSection = semanticProfile ? buildSemanticSection(semanticProfile) : "";
 
   return `You are a data intelligence analyst. You have read this dataset completely.
@@ -219,31 +211,25 @@ function buildSystemPrompt(
 DATASET: ${session.name}
 SOURCE: ${connector.toUpperCase()} — ${connectorNote}
 VARIABLES: ${session.variable_count} across ${session.concept_count} concept domains
-${connector === "census" ? `GEOGRAPHIES: ${(session.geography_depth as string[] || []).join(", ")}` : ""}
-
 CONCEPT DOMAINS:
 ${topConcepts}
-
 STRUCTURAL GAPS:
 ${absenceList}
-
-BUILDER'S LENS:
-${session.lens_summary}
+BUILDER'S LENS: ${session.lens_summary}
 ${semanticSection}
 ${dataSection}
-READING POSTURE — internalize, never surface:
-${psi > 0.7 ? "- Internal structure is coherent." : "- Internal gaps present — cross-referencing requires care."}
-${q > 0.6 ? "- Contested categories present. Name the contestedness when it matters." : "- Categories appear neutral — look for what has been naturalized."}
-${lambda > 0.6 ? "- Measurer's assumptions are deep in the structure." : "- Moderate interpretive load."}
-${tau > 0.7 ? "- Temporal depth available — trend claims are supportable." : "- Limited temporal depth — be careful with trends."}
+READING POSTURE (internalize, never surface):
+${psi > 0.7 ? "- Coherent internal structure." : "- Internal gaps — cross-referencing requires care."}
+${q > 0.6 ? "- Contested categories present. Name contestedness when it matters." : "- Categories appear neutral — look for what has been naturalized."}
+${lambda > 0.6 ? "- Measurer assumptions are deep in the structure." : "- Moderate interpretive load."}
+${tau > 0.7 ? "- Temporal depth available." : "- Limited temporal depth — be careful with trends."}
 ${f < 0.5 ? "- Aggregate unit of analysis — individual experience is flattened." : "- Individual-level resolution available."}
-${moe > 60 ? `- ${moe}% uncertainty documented.` : `- Only ${moe}% uncertainty documented — confidence intervals largely absent.`}
+${moe > 60 ? `- ${moe}% uncertainty documented.` : `- Only ${moe}% uncertainty documented.`}
 
 PRINCIPLES:
-- When you have actual data, use it. Specific values. Named rows. No approximation.
+- Use actual data values when available. Specific numbers. Named rows. No approximation.
 - Surface what is there and what is absent. Translation, not judgment.
-- Proxy risk fields: name the risk when a user is considering modeling or scoring use.
-- If something isn't in the profile, say so. Don't construct from silence.
-- Plain language. No academic hedging.
+- Name proxy risk when a user is considering modeling or scoring use.
+- If something is not in the profile, say so. Do not construct from silence.
 - False confidence is worse than acknowledged uncertainty.`;
 }

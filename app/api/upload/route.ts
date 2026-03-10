@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { profileCSV } from "@/lib/csv-profiler";
 import { buildCoherenceGraph, ColumnNode } from "@/lib/coherence-graph";
+import { checkAuth, withTokenHeaders } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -47,13 +48,16 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + token check
+    const auth = await checkAuth(request, "upload");
+    if (auth instanceof NextResponse) return auth;
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
 
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "csv") return NextResponse.json({ error: "Only CSV files supported currently" }, { status: 400 });
-
     if (file.size > 4 * 1024 * 1024)
       return NextResponse.json({ error: "File too large. Max 4MB." }, { status: 400 });
 
@@ -66,10 +70,10 @@ export async function POST(request: NextRequest) {
     const db = getDB();
 
     const sessionRes = await db.query(
-      `INSERT INTO db_sessions (name, connector, dataset_id, vintage, endpoint_url, profiled_at, variable_count, concept_count, geography_depth)
-       VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8) RETURNING id`,
+      `INSERT INTO db_sessions (name, connector, dataset_id, vintage, endpoint_url, profiled_at, variable_count, concept_count, geography_depth, api_key_id)
+       VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9) RETURNING id`,
       [profile.name, "csv", file.name, new Date().getFullYear(),
-       `upload:${file.name}`, profile.variable_count, profile.concept_count, []]
+       `upload:${file.name}`, profile.variable_count, profile.concept_count, [], auth.api_key_id]
     );
     const sessionId = sessionRes.rows[0].id;
 
@@ -81,19 +85,14 @@ export async function POST(request: NextRequest) {
       await db.query(`INSERT INTO db_variables (session_id,name,label,concept,predicate_type,has_moe,is_moe) VALUES ${vals}`, flat);
     }
 
-    // Run 7-agent semantic profiler
     const columnNodes: ColumnNode[] = profile.columns.map(c => ({
-      name: c.name,
-      sample_values: c.sample_values,
-      null_rate: c.null_rate,
-      unique_count: c.unique_count,
-      row_count: profile.row_count,
-      inferred_concept: c.concept,
+      name: c.name, sample_values: c.sample_values,
+      null_rate: c.null_rate, unique_count: c.unique_count,
+      row_count: profile.row_count, inferred_concept: c.concept,
     }));
 
     const semanticProfile = await buildCoherenceGraph(columnNodes, file.name);
 
-    // Store Rose Glass profile + semantic profile
     await db.query(
       `INSERT INTO rg_profiles (session_id,psi,rho,q,f,tau,lambda,absences,moe_coverage,suppression_rate,lens_summary,semantic_profile)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (session_id) DO NOTHING`,
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
     await db.query(`UPDATE db_sessions SET endpoint_url=$1 WHERE id=$2`,
       [`csv_data:${sampleJson.slice(0, 100000)}`, sessionId]);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       session_id: sessionId,
       name: profile.name,
       variable_count: profile.variable_count,
@@ -114,6 +113,7 @@ export async function POST(request: NextRequest) {
       row_count: profile.row_count,
       moe_coverage: 0,
       geographies: [],
+      tokens_remaining: auth.tokens_remaining,
       profile: { absences: profile.absences, lens_summary: profile.lens_summary },
       semantic_profile: semanticProfile ? {
         grain: semanticProfile.grain,
@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
         use_limitations: semanticProfile.use_limitations,
       } : null,
     });
+
+    return withTokenHeaders(response, auth);
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
