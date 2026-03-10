@@ -4,11 +4,13 @@ import { useState, useRef, useEffect } from "react";
 type Session = {
   id: string; name: string; dataset_id: string; vintage: number;
   variable_count: number; concept_count: number; moe_coverage: number;
+  connector?: string;
 };
 type ConnectResult = {
   session_id: string; name: string; variable_count: number;
   concept_count: number; moe_coverage: number; geographies: string[];
   profile: { absences: Array<{ domain: string; absence: string; significance: string }>; lens_summary: string };
+  row_count?: number; tables?: string[];
 };
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -39,7 +41,13 @@ export default function Home() {
   const [sending, setSending] = useState(false);
   const [customDataset, setCustomDataset] = useState("");
   const [customVintage, setCustomVintage] = useState("2023");
+  const [dbString, setDbString] = useState("");
+  const [dbName, setDbName] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [homeTab, setHomeTab] = useState<"census"|"upload"|"postgres">("census");
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/sessions").then(r => r.json()).then(d => setSessions(d.sessions || []));
@@ -58,13 +66,50 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Connection failed");
-      setActiveSession(data);
-      setMessages([{ role: "assistant", content: `I've read the structure of **${data.name}**.\n\n${data.variable_count.toLocaleString()} variables across ${data.concept_count} concept domains. What do you want to understand about it?` }]);
-      setStage("chat");
-      fetch("/api/sessions").then(r => r.json()).then(d => setSessions(d.sessions || []));
+      openSession(data, name);
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : "Failed"); setStage("home");
     } finally { setConnecting(false); }
+  }
+
+  async function uploadCSV() {
+    if (!uploadFile) return;
+    setUploading(true); setConnectError(null); setStage("connecting");
+    try {
+      const form = new FormData();
+      form.append("file", uploadFile);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      openSession(data, uploadFile.name.replace(/\.[^.]+$/, ""));
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Upload failed"); setStage("home");
+    } finally { setUploading(false); }
+  }
+
+  async function connectPostgres() {
+    if (!dbString.trim()) return;
+    setConnecting(true); setConnectError(null); setStage("connecting");
+    try {
+      const res = await fetch("/api/db-connect", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connection_string: dbString, name: dbName || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Connection failed");
+      openSession(data, dbName || "PostgreSQL database");
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Connection failed"); setStage("home");
+    } finally { setConnecting(false); }
+  }
+
+  function openSession(data: ConnectResult, name: string) {
+    setActiveSession(data);
+    const rowNote = data.row_count ? ` across ${data.row_count.toLocaleString()} rows` : "";
+    const tableNote = data.tables ? ` in ${data.tables.length} table${data.tables.length > 1 ? "s" : ""}` : "";
+    setMessages([{ role: "assistant", content: `I've read the structure of **${data.name || name}**.\n\n${data.variable_count.toLocaleString()} variables across ${data.concept_count} concept domains${rowNote}${tableNote}. What do you want to understand about it?` }]);
+    setStage("chat");
+    fetch("/api/sessions").then(r => r.json()).then(d => setSessions(d.sessions || []));
   }
 
   async function sendMessage() {
@@ -101,7 +146,11 @@ export default function Home() {
     .home{max-width:880px;margin:0 auto;padding:4rem 2rem}
     .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#e8dfc8;margin-bottom:1.5rem;letter-spacing:0.02em}
     .home-lede em{color:#c8a96e;font-style:italic}
-    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:3.5rem;font-family:'Georgia',serif}
+    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif}
+    .tab-row{display:flex;gap:0;margin-bottom:2rem;border-bottom:1px solid rgba(180,150,90,0.1)}
+    .tab{padding:0.6rem 1.4rem;background:none;border:none;border-bottom:2px solid transparent;color:#3a3f50;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;transition:all 0.15s;margin-bottom:-1px}
+    .tab:hover{color:#7a7f8a}
+    .tab.active{color:#c8a96e;border-bottom-color:#c8a96e}
     .preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1px;background:rgba(180,150,90,0.08);border:1px solid rgba(180,150,90,0.08);margin-bottom:2.5rem}
     .preset-card{background:#07090f;padding:1.5rem;cursor:pointer;transition:background 0.2s;border:none;text-align:left;color:inherit;width:100%}
     .preset-card:hover{background:rgba(200,169,110,0.04)}
@@ -115,15 +164,26 @@ export default function Home() {
     .field-input{background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;outline:none;width:260px;transition:border-color 0.2s}
     .field-input:focus{border-color:rgba(200,169,110,0.35)}
     .field-input.short{width:100px}
+    .field-input.wide{width:480px}
     .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
     .rg-btn:hover:not(:disabled){background:rgba(200,169,110,0.07)}
     .rg-btn:disabled{border-color:#252a35;color:#252a35;cursor:not-allowed}
+    .upload-zone{border:1px dashed rgba(180,150,90,0.2);padding:2.5rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem;background:rgba(255,255,255,0.01)}
+    .upload-zone:hover{border-color:rgba(200,169,110,0.4);background:rgba(200,169,110,0.02)}
+    .upload-zone.has-file{border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.03)}
+    .uz-icon{font-size:1.8rem;margin-bottom:0.6rem;opacity:0.4}
+    .uz-label{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#9a9880;margin-bottom:0.3rem}
+    .uz-sub{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#3a3f50;letter-spacing:0.1em}
+    .uz-filename{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#c8a96e;margin-top:0.5rem}
+    .pg-form{display:flex;flex-direction:column;gap:1rem;max-width:560px;margin-bottom:2rem}
+    .pg-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em;line-height:1.7;margin-top:-0.3rem}
     .prior-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.9rem}
     .prior-list{display:flex;flex-direction:column;gap:1px}
     .prior-item{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.06);cursor:pointer;transition:background 0.15s}
     .prior-item:hover{background:rgba(200,169,110,0.03)}
     .prior-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:#9a9880}
     .prior-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em}
+    .connector-badge{font-size:0.5rem;padding:0.15rem 0.4rem;border:1px solid rgba(180,150,90,0.15);color:#3a4050;font-family:'JetBrains Mono',monospace;letter-spacing:0.15em;text-transform:uppercase;margin-right:0.5rem}
     .connecting{max-width:600px;margin:0 auto;padding:7rem 2rem;text-align:center}
     .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#c8a96e;margin-bottom:1rem;font-weight:300}
     .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.2em;animation:blink 1.4s infinite}
@@ -151,13 +211,22 @@ export default function Home() {
     .chat-input::placeholder{color:#252a35;font-style:italic}
     .err{background:rgba(180,60,60,0.06);border:1px solid rgba(180,60,60,0.18);padding:0.7rem 1rem;margin-bottom:1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:#b06060}
     .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c8a96e;margin:0 2px;animation:dot 1.2s infinite}
-    .dots span:nth-child(2){animation-delay:0.2s}
-    .dots span:nth-child(3){animation-delay:0.4s}
+    .dots span:nth-child(2){animation-delay:0.2s}.dots span:nth-child(3){animation-delay:0.4s}
     @keyframes dot{0%,80%,100%{transform:scale(0.6);opacity:0.3}40%{transform:scale(1);opacity:1}}
   `;
 
+  const connectingLabel = homeTab === "upload"
+    ? "Reading your CSV" : homeTab === "postgres"
+    ? "Introspecting database schema" : "Reading dataset structure";
+
+  const connectingSub = homeTab === "upload"
+    ? "parsing columns · inferring types · detecting absences"
+    : homeTab === "postgres"
+    ? "connecting · reading schema · profiling tables"
+    : "fetching variable manifest · profiling concepts · detecting absences";
+
   return (
-    <div style={{ minHeight: "100vh", background: "#07090f", color: "#c4c8d4", fontFamily: "'Georgia',serif" }}>
+    <div style={{ minHeight: "100vh", background: "#07090f", color: "#c4c8d4" }}>
       <style>{CSS}</style>
       <header className="rg-header">
         <div className="rg-mark">Rose Glass</div>
@@ -167,35 +236,84 @@ export default function Home() {
       {stage === "home" && (
         <div className="home">
           <h1 className="home-lede">What does this database <em>believe</em><br />about the world it measures?</h1>
-          <p className="home-sub">Connect a public dataset. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts. Then talk to it.</p>
+          <p className="home-sub">Connect a public dataset or upload your own. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts.</p>
           {connectError && <div className="err">{connectError}</div>}
-          <div className="preset-grid">
-            {PRESETS.map(ds => (
-              <button key={ds.dataset_id} className="preset-card" onClick={() => connectDataset(ds.dataset_id, ds.vintage, ds.label)} disabled={connecting}>
-                <div className="pc-label">{ds.label}</div>
-                <div className="pc-desc">{ds.desc}</div>
-                <span className="pc-cta">Connect →</span>
+
+          <div className="tab-row">
+            {(["census","upload","postgres"] as const).map(t => (
+              <button key={t} className={`tab ${homeTab === t ? "active" : ""}`} onClick={() => setHomeTab(t)}>
+                {t === "census" ? "Public Data" : t === "upload" ? "Upload CSV" : "PostgreSQL"}
               </button>
             ))}
           </div>
-          <div className="custom-row">
-            <div>
-              <label className="field-label">Custom dataset ID</label>
-              <input className="field-input" value={customDataset} onChange={e => setCustomDataset(e.target.value)} placeholder="e.g. acs/acs5" />
+
+          {homeTab === "census" && (<>
+            <div className="preset-grid">
+              {PRESETS.map(ds => (
+                <button key={ds.dataset_id} className="preset-card" onClick={() => connectDataset(ds.dataset_id, ds.vintage, ds.label)} disabled={connecting}>
+                  <div className="pc-label">{ds.label}</div>
+                  <div className="pc-desc">{ds.desc}</div>
+                  <span className="pc-cta">Connect →</span>
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="field-label">Vintage</label>
-              <input className="field-input short" value={customVintage} onChange={e => setCustomVintage(e.target.value)} placeholder="2023" />
+            <div className="custom-row">
+              <div><label className="field-label">Custom dataset ID</label>
+                <input className="field-input" value={customDataset} onChange={e => setCustomDataset(e.target.value)} placeholder="e.g. acs/acs5" /></div>
+              <div><label className="field-label">Vintage</label>
+                <input className="field-input short" value={customVintage} onChange={e => setCustomVintage(e.target.value)} placeholder="2023" /></div>
+              <button className="rg-btn" onClick={() => connectDataset(customDataset, parseInt(customVintage), `${customDataset} ${customVintage}`)} disabled={connecting || !customDataset.trim()}>Connect</button>
             </div>
-            <button className="rg-btn" onClick={() => connectDataset(customDataset, parseInt(customVintage), `${customDataset} ${customVintage}`)} disabled={connecting || !customDataset.trim()}>Connect</button>
-          </div>
+          </>)}
+
+          {homeTab === "upload" && (
+            <div style={{ maxWidth: 560, marginBottom: "3rem" }}>
+              <div className="upload-zone has-file" onClick={() => fileInputRef.current?.click()}>
+                <div className="uz-icon">⬆</div>
+                <div className="uz-label">{uploadFile ? uploadFile.name : "Drop a CSV or click to browse"}</div>
+                <div className="uz-sub">{uploadFile ? `${(uploadFile.size / 1024).toFixed(0)} KB` : "CSV files up to 50MB"}</div>
+                {uploadFile && <div className="uz-filename">Ready to profile</div>}
+              </div>
+              <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }}
+                onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+              <button className="rg-btn" onClick={uploadCSV} disabled={!uploadFile || uploading}>
+                {uploading ? "Profiling…" : "Profile this dataset →"}
+              </button>
+              <p style={{ marginTop: "1rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#252a35", lineHeight: 1.7 }}>
+                Rose Glass will read your column structure, infer what domains are present, detect what is absent, and open a conversation about what the dataset believes about the world it measures.
+              </p>
+            </div>
+          )}
+
+          {homeTab === "postgres" && (
+            <div className="pg-form">
+              <div>
+                <label className="field-label">Connection string</label>
+                <input className="field-input wide" type="password" value={dbString}
+                  onChange={e => setDbString(e.target.value)}
+                  placeholder="postgresql://user:password@host:5432/dbname" />
+                <div className="pg-note" style={{ marginTop: "0.4rem" }}>Connection used in-flight only. Never stored. Public schema introspected.</div>
+              </div>
+              <div>
+                <label className="field-label">Dataset name (optional)</label>
+                <input className="field-input" value={dbName} onChange={e => setDbName(e.target.value)} placeholder="e.g. Recovery App Database" />
+              </div>
+              <button className="rg-btn" onClick={connectPostgres} disabled={connecting || !dbString.trim()}>
+                {connecting ? "Connecting…" : "Connect →"}
+              </button>
+            </div>
+          )}
+
           {sessions.length > 0 && (
             <div>
               <div className="prior-title">Prior sessions</div>
               <div className="prior-list">
                 {sessions.map(s => (
                   <div key={s.id} className="prior-item" onClick={() => resumeSession(s)}>
-                    <span className="prior-name">{s.name}</span>
+                    <span className="prior-name">
+                      <span className="connector-badge">{s.connector || "census"}</span>
+                      {s.name}
+                    </span>
                     <span className="prior-meta">{s.variable_count?.toLocaleString()} vars · {s.vintage}</span>
                   </div>
                 ))}
@@ -207,8 +325,8 @@ export default function Home() {
 
       {stage === "connecting" && (
         <div className="connecting">
-          <div className="conn-title">Reading dataset structure</div>
-          <div className="conn-sub">fetching variable manifest · profiling concepts · detecting absences</div>
+          <div className="conn-title">{connectingLabel}</div>
+          <div className="conn-sub">{connectingSub}</div>
         </div>
       )}
 
@@ -219,7 +337,7 @@ export default function Home() {
             <div className="sb-meta">
               {activeSession.variable_count?.toLocaleString()} variables<br />
               {activeSession.concept_count} concept domains<br />
-              {activeSession.moe_coverage}% error margin coverage
+              {activeSession.moe_coverage > 0 ? `${activeSession.moe_coverage}% error margin coverage` : ""}
             </div>
             <hr className="sb-hr" />
             <div className="sb-section">Ask about</div>
@@ -242,7 +360,10 @@ export default function Home() {
               <div ref={chatEndRef} />
             </div>
             <div className="input-row">
-              <textarea className="chat-input" value={input} onChange={e => setInput(e.target.value)} placeholder="Ask anything about this dataset…" onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} rows={1} />
+              <textarea className="chat-input" value={input} onChange={e => setInput(e.target.value)}
+                placeholder="Ask anything about this dataset…"
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                rows={1} />
               <button className="rg-btn" onClick={sendMessage} disabled={sending || !input.trim()}>Send</button>
             </div>
           </div>

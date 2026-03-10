@@ -34,13 +34,21 @@ function detectTopicAndState(message: string): { topic: string | null; state: st
   }
   let state: string | null = null;
   const lower = message.toLowerCase();
-  // Try two-word state names first, then single-word
   const twoWord = STATE_NAMES.filter(s => s.includes(" "));
   const oneWord = STATE_NAMES.filter(s => !s.includes(" "));
   for (const s of [...twoWord, ...oneWord]) {
     if (lower.includes(s)) { state = s; break; }
   }
   return { topic, state };
+}
+
+// Extract CSV sample data from endpoint_url for non-census sessions
+function extractCSVSample(endpointUrl: string): { headers: string[]; rows: string[][] } | null {
+  if (!endpointUrl?.startsWith("csv_data:")) return null;
+  try {
+    const json = endpointUrl.slice("csv_data:".length);
+    return JSON.parse(json);
+  } catch { return null; }
 }
 
 export async function POST(request: NextRequest) {
@@ -75,15 +83,21 @@ export async function POST(request: NextRequest) {
       )
     ]);
 
-    // Detect topic and state — call Census API directly (no internal HTTP)
-    const { topic: detectedTopic, state: detectedState } = detectTopicAndState(message);
+    // Branch: Census gets live API queries; CSV/Postgres gets sample data from session
     let sampleData: SampleResult | null = null;
-    if (detectedTopic) {
-      const stateFips = detectedState ? resolveStateFips(detectedState) : undefined;
-      sampleData = await queryCensus(session.dataset_id, session.vintage, detectedTopic, stateFips);
+    let csvSample: { headers: string[]; rows: string[][] } | null = null;
+
+    if (session.connector === "census" || !session.connector) {
+      const { topic: detectedTopic, state: detectedState } = detectTopicAndState(message);
+      if (detectedTopic) {
+        const stateFips = detectedState ? resolveStateFips(detectedState) : undefined;
+        sampleData = await queryCensus(session.dataset_id, session.vintage, detectedTopic, stateFips);
+      }
+    } else if (session.connector === "csv") {
+      csvSample = extractCSVSample(session.endpoint_url);
     }
 
-    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData);
+    const systemPrompt = buildSystemPrompt(session, conceptsRes.rows, sampleData, csvSample);
 
     await db.query(
       `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
@@ -118,11 +132,12 @@ export async function POST(request: NextRequest) {
 function buildSystemPrompt(
   session: Record<string, unknown>,
   concepts: Array<{ concept: string; count: string; moe_count: string }>,
-  sampleData: SampleResult | null
+  sampleData: SampleResult | null,
+  csvSample: { headers: string[]; rows: string[][] } | null
 ): string {
   const absences = (session.absences as Array<{ domain: string; absence: string; significance: string }>) || [];
   const topConcepts = concepts.slice(0, 20)
-    .map(c => `  ${c.concept} (${c.count} variables, ${c.moe_count} with error margins)`)
+    .map(c => `  ${c.concept} (${c.count} variables)`)
     .join("\n");
   const absenceList = absences
     .map(a => `  [${a.domain}] ${a.absence}: ${a.significance}`)
@@ -134,8 +149,10 @@ function buildSystemPrompt(
   const tau = Number(session.tau) || 0.5;
   const lambda = Number(session.lambda) || 0.5;
   const moe = Number(session.moe_coverage) || 0;
+  const connector = (session.connector as string) || "census";
 
   let dataSection = "";
+
   if (sampleData && sampleData.rows.length > 0) {
     const rowSummary = sampleData.rows.map(r => {
       const name = r["NAME"] || "?";
@@ -145,25 +162,29 @@ function buildSystemPrompt(
         ? ` of ${r[sampleData.variables[0]]} total` : "";
       return `  ${name}: ${rate}${count}${total}`;
     }).join("\n");
-
-    dataSection = `
-
-LIVE CENSUS DATA — REAL VALUES FROM THIS DATASET. YOU MUST USE THESE IN YOUR RESPONSE:
-${sampleData.query_description}
-${sampleData.note ? `(${sampleData.note})` : ""}
-${rowSummary}
-
-These numbers are from the actual Census API. Name specific counties and cite their exact rates.
-Do not hedge. Do not say you need to query. Do not approximate. Use what is above.
-`;
+    dataSection = `\nLIVE DATA — USE THESE EXACT VALUES:\n${sampleData.query_description}\n${sampleData.note ? `(${sampleData.note})` : ""}\n${rowSummary}\n\nDo not hedge. Do not approximate. Use what is above.\n`;
   }
+
+  if (csvSample && csvSample.headers.length > 0) {
+    const header = csvSample.headers.join(" | ");
+    const sampleRows = csvSample.rows.slice(0, 10)
+      .map(r => r.map((v, i) => csvSample.headers[i] ? `${csvSample.headers[i]}: ${v}` : v).join(", "))
+      .join("\n  ");
+    dataSection = `\nSAMPLE DATA (first 10 rows of ${session.name}):\nColumns: ${header}\n\n  ${sampleRows}\n\nYou can reason directly from these values. When the user asks a question answerable from the data, use it.\n`;
+  }
+
+  const connectorNote = connector === "csv"
+    ? "This is a user-uploaded CSV file. You have access to sample data above."
+    : connector === "postgres"
+    ? "This is a user-connected PostgreSQL database. You see the schema structure; live queries would require database access."
+    : "This is a US Census Bureau public API dataset.";
 
   return `You are a Rose Glass intelligence analyst embedded in this dataset. You have read its complete structure.
 
 DATASET: ${session.name}
-SOURCE: ${session.dataset_id} vintage ${session.vintage}
+CONNECTOR: ${connector.toUpperCase()} — ${connectorNote}
 VARIABLES: ${session.variable_count} across ${session.concept_count} concept domains
-GEOGRAPHIES: ${(session.geography_depth as string[] || []).join(", ")}
+${connector === "census" ? `GEOGRAPHIES: ${(session.geography_depth as string[] || []).join(", ")}` : ""}
 
 WHAT THIS DATA MEASURES:
 ${topConcepts}
@@ -175,18 +196,18 @@ HOW IT WAS BUILT:
 ${session.lens_summary}
 ${dataSection}
 YOUR READING POSTURE — internalize, never quote:
-${psi > 0.7 ? "- Framework is internally coherent." : "- Framework has internal gaps."}
-${q > 0.6 ? "- Contested categories present. Name the contestedness." : "- Categories appear neutral. Look for what's been naturalized."}
-${lambda > 0.6 ? "- High worldview interference: measurer's assumptions baked deep." : "- Moderate worldview interference."}
+${psi > 0.7 ? "- Framework is internally coherent." : "- Framework has internal gaps. Be careful about cross-referencing."}
+${q > 0.6 ? "- Contested categories present. Name the contestedness when relevant." : "- Categories appear neutral. Look for what has been naturalized."}
+${lambda > 0.6 ? "- High worldview interference: the measurer's assumptions are baked deep into the structure." : "- Moderate worldview interference."}
 ${tau > 0.7 ? "- Meaningful temporal depth. You can speak to trends." : "- Limited temporal depth. Be careful about trend claims."}
-${f < 0.5 ? "- Household is the unit. People outside that mold are undercounted." : "- Individual-level data available, though household proxies dominate."}
-${moe > 60 ? `- ${moe}% MOE coverage.` : `- Only ${moe}% MOE coverage — much uncertainty undocumented.`}
+${f < 0.5 ? "- Household or aggregate is the unit. Individual experience is flattened." : "- Individual-level data available."}
+${moe > 60 ? `- ${moe}% error margin coverage.` : `- Only ${moe}% error margin coverage — uncertainty is largely undocumented.`}
 
 PRINCIPLES:
-- When you have live data above, USE IT. Named counties. Exact percentages. No hedging.
-- Translation, not judgment.
-- If absent from the profile, say so. Don't construct from silence.
+- When you have actual data above, use it. Specific values. Named rows. No approximation.
+- Translation, not judgment. Surface what is there and what is absent.
+- If something is not in the profile or sample, say so. Don't construct from silence.
 - Never mention Rose Glass, dimensional scores, or framework names.
-- Plain language. No academic hedging.
+- Plain language. No academic hedging. No "it is important to note."
 - False confidence is worse than acknowledged uncertainty.`;
 }
