@@ -95,9 +95,15 @@ export default function DashboardPage() {
         body: JSON.stringify({ email: account.email, plan: "pro" }),
       });
       const data = await res.json();
-      if (data.checkout_url) window.location.href = data.checkout_url;
-      else setMsg({ text: data.error || "Checkout failed", ok: false });
-    } catch { setMsg({ text: "Network error", ok: false }); }
+      if (data.checkout_url && data.checkout_url.startsWith("http")) {
+        window.location.href = data.checkout_url;
+      } else {
+        // Fallback to direct payment link if checkout session fails
+        window.location.href = "https://buy.stripe.com/aFa9ANfZXcPjbZfcCk7wA00";
+      }
+    } catch {
+      window.location.href = "https://buy.stripe.com/aFa9ANfZXcPjbZfcCk7wA00";
+    }
     finally { setUpgrading(false); }
   }
 

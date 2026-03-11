@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import InferenceMap from "./components/InferenceMap";
 
 function getApiKey(): string {
   if (typeof window === "undefined") return "";
@@ -374,6 +375,14 @@ export default function Home() {
             {STARTERS.map(q => (
               <button key={q} className="starter" onClick={() => setInput(q)}>{q}</button>
             ))}
+            <hr className="sb-hr" />
+            {activeSession.profile?.absences?.length > 0 && (
+              <InferenceMap
+                absences={activeSession.profile.absences}
+                lens_summary={activeSession.profile.lens_summary}
+                datasetName={activeSession.name}
+              />
+            )}
             <hr className="sb-hr" />
             <button className="back" onClick={() => setStage("home")}>← New dataset</button>
           </aside>
