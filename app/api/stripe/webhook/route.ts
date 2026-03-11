@@ -78,15 +78,40 @@ export async function POST(request: NextRequest) {
       const plan = (obj.metadata as Record<string, string>)?.plan || "pro";
       const tokens = status === "active" ? (PLAN_TOKENS[plan] ?? -1) : 10000;
 
-      await db.query(
+      // First try update by customer ID (normal path)
+      const updateResult = await db.query(
         `UPDATE api_keys
          SET subscription_status = $1,
              stripe_subscription_id = $2,
              plan = CASE WHEN $1 = 'active' THEN $3 ELSE 'trial' END,
              tokens_remaining = $4
-         WHERE stripe_customer_id = $5`,
+         WHERE stripe_customer_id = $5
+         RETURNING id`,
         [status, subscriptionId, plan, tokens, customerId]
       );
+
+      // Fallback: if customer ID not in DB yet, fetch email from Stripe and match by email
+      if (updateResult.rowCount === 0 && customerId && status === "active") {
+        const stripeRes = await fetch(`https://api.stripe.com/v1/customers/${customerId}`, {
+          headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }
+        });
+        if (stripeRes.ok) {
+          const customer = await stripeRes.json();
+          const email = customer.email?.toLowerCase();
+          if (email) {
+            await db.query(
+              `UPDATE api_keys
+               SET subscription_status = $1,
+                   stripe_customer_id = $6,
+                   stripe_subscription_id = $2,
+                   plan = $3,
+                   tokens_remaining = $4
+               WHERE LOWER(email) = $5`,
+              [status, subscriptionId, plan, tokens, email, customerId]
+            );
+          }
+        }
+      }
     }
 
     if (event.type === "customer.subscription.deleted") {
