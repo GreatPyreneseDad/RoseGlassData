@@ -113,6 +113,20 @@ export async function POST(request: NextRequest) {
       [sessionId, psi, rho, q, f, tau, lambda, JSON.stringify(absences), moe_coverage, 0, lens_summary]
     );
 
+    // Fetch the semantic profile if it was generated
+    let semanticProfile = null;
+    const profileRes = await db.query(
+      `SELECT semantic_profile FROM rg_profiles WHERE session_id = $1`,
+      [sessionId]
+    );
+    if (profileRes.rows.length > 0 && profileRes.rows[0].semantic_profile) {
+      try {
+        semanticProfile = typeof profileRes.rows[0].semantic_profile === "string"
+          ? JSON.parse(profileRes.rows[0].semantic_profile)
+          : profileRes.rows[0].semantic_profile;
+      } catch { /* ignore */ }
+    }
+
     const response = NextResponse.json({
       session_id: sessionId,
       name: name || `${dataset_id} ${vintage}`,
@@ -121,6 +135,7 @@ export async function POST(request: NextRequest) {
       moe_coverage, geographies,
       tokens_remaining: auth.tokens_remaining,
       profile: { absences, lens_summary },
+      semantic_profile: semanticProfile,
     });
     return withTokenHeaders(response, auth);
 

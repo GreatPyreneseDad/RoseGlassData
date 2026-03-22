@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import InferenceMap from "./components/InferenceMap";
+import SemanticProfile from "./components/SemanticProfile";
 
 function getApiKey(): string {
   if (typeof window === "undefined") return "";
@@ -16,10 +17,29 @@ type Session = {
   variable_count: number; concept_count: number; moe_coverage: number;
   connector?: string;
 };
+type SemanticColumn = {
+  column: string;
+  semantic_type: string;
+  collection_method: string;
+  null_semantics: string;
+  cardinality_class: string;
+  referential_dependencies: string[];
+  proxy_risk: string;
+  proxy_risk_note: string;
+  lineage_note: string;
+};
+type DatasetProfile = {
+  semantic_columns: SemanticColumn[];
+  grain: string;
+  dataset_class: string;
+  analytical_scope: string;
+  use_limitations: string[];
+};
 type ConnectResult = {
   session_id: string; name: string; variable_count: number;
   concept_count: number; moe_coverage: number; geographies: string[];
   profile: { absences: Array<{ domain: string; absence: string; significance: string }>; lens_summary: string };
+  semantic_profile?: DatasetProfile;
   row_count?: number; tables?: string[];
 };
 type Message = { role: "user" | "assistant"; content: string };
@@ -144,10 +164,17 @@ export default function Home() {
     } finally { setSending(false); }
   }
 
-  function resumeSession(s: Session) {
-    setActiveSession({ session_id: s.id, name: s.name, variable_count: s.variable_count, concept_count: s.concept_count, moe_coverage: s.moe_coverage, geographies: [], profile: { absences: [], lens_summary: "" } });
-    setMessages([{ role: "assistant", content: `Resuming **${s.name}**. What do you want to understand about it?` }]);
-    setStage("chat");
+  async function resumeSession(s: Session) {
+    try {
+      const res = await fetch(`/api/session?session_id=${s.id}`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error("Failed to load session");
+      const data = await res.json() as ConnectResult;
+      setActiveSession(data);
+      setMessages([{ role: "assistant", content: `Resuming **${s.name}**. What do you want to understand about it?` }]);
+      setStage("chat");
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Failed to load session");
+    }
   }
 
   const CSS = `
@@ -376,6 +403,10 @@ export default function Home() {
               <button key={q} className="starter" onClick={() => setInput(q)}>{q}</button>
             ))}
             <hr className="sb-hr" />
+            {activeSession.semantic_profile && (
+              <SemanticProfile profile={activeSession.semantic_profile} />
+            )}
+            {activeSession.semantic_profile && <hr className="sb-hr" />}
             {activeSession.profile?.absences?.length > 0 && (
               <InferenceMap
                 absences={activeSession.profile.absences}

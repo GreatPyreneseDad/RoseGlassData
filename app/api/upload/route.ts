@@ -115,12 +115,7 @@ export async function POST(request: NextRequest) {
       geographies: [],
       tokens_remaining: auth.tokens_remaining,
       profile: { absences: profile.absences, lens_summary: profile.lens_summary },
-      semantic_profile: semanticProfile ? {
-        grain: semanticProfile.grain,
-        dataset_class: semanticProfile.dataset_class,
-        analytical_scope: semanticProfile.analytical_scope,
-        use_limitations: semanticProfile.use_limitations,
-      } : null,
+      semantic_profile: semanticProfile || null,
     });
 
     return withTokenHeaders(response, auth);
