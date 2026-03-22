@@ -270,7 +270,7 @@ export default function Home() {
     <div style={{ minHeight: "100vh", background: "#07090f", color: "#c4c8d4" }}>
       <style>{CSS}</style>
       <header className="rg-header">
-        <div className="rg-mark">Rose Glass</div>
+        <div className="rg-mark" style={{display:"flex",alignItems:"center",gap:"12px"}}><img src="/logo.png" alt="Rose Glass Data" style={{height:"48px",width:"48px",borderRadius:"8px"}} />Rose Glass Data</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <div className="rg-tag">Translation · Not Judgment</div>
           <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#3a3f50" : "#c8a96e", textDecoration: "none", border: hasKey ? "none" : "1px solid rgba(200,169,110,0.35)", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>

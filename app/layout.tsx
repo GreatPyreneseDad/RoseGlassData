@@ -13,6 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  icons: {
+    icon: "/favicon.png",
+    apple: "/logo-192.png",
+  },
   title: "Rose Glass",
   description: "IPAI Dimensional News Analysis Platform",
 };
