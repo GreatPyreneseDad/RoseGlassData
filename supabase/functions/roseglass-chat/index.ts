@@ -285,6 +285,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Ensure session row exists (FK target for chat_messages and coherence_readings)
+    await supabase
+      .from("db_sessions")
+      .upsert(
+        { id: session_id, name: "roseglass-chat", connector: "roseglass-cx" },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
+
     // 1. Get conversation history + accumulated τ across sessions
     const { data: history } = await supabase
       .from("chat_messages")
@@ -361,14 +369,16 @@ Deno.serve(async (req) => {
     }
 
     // 3. Store user message
-    const { data: msgRow } = await supabase
+    const { data: msgRow, error: msgErr } = await supabase
       .from("chat_messages")
       .insert({ session_id, role: "user", content: message })
       .select("id")
       .single();
 
+    if (msgErr) console.error("[roseglass-chat] user msg insert failed:", msgErr);
+
     // 4. Store coherence reading
-    await supabase.from("coherence_readings").insert({
+    const { error: crErr } = await supabase.from("coherence_readings").insert({
       session_id,
       message_id: msgRow?.id,
       a_q: cxReading.zones.q.A,
@@ -386,6 +396,8 @@ Deno.serve(async (req) => {
       has_dark_spot: cxReading.has_dark_spot,
       zone_detail: cxReading.zones,
     });
+
+    if (crErr) console.error("[roseglass-chat] coherence_readings insert failed:", crErr);
 
     // 5. Build system prompt with C(x) injection
     const systemPrompt = buildSystemPrompt(cxReading, msgCount);
@@ -423,9 +435,11 @@ Deno.serve(async (req) => {
       "No response";
 
     // 8. Store assistant message
-    await supabase
+    const { error: asstErr } = await supabase
       .from("chat_messages")
       .insert({ session_id, role: "assistant", content: assistantContent });
+
+    if (asstErr) console.error("[roseglass-chat] assistant msg insert failed:", asstErr);
 
     // 9. Return response + topology
     return new Response(
