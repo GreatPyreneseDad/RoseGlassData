@@ -423,16 +423,24 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1024,
+          max_tokens: 4096,
           system: systemPrompt,
           messages: apiMessages,
+          tools: [
+            {
+              type: "web_search_20250305",
+              name: "web_search",
+            },
+          ],
         }),
       },
     );
     const anthropicData = await anthropicRes.json();
     const assistantContent =
-      anthropicData.content?.map((b: { text?: string }) => b.text || "").join("") ||
-      "No response";
+      anthropicData.content
+        ?.filter((b: { type: string }) => b.type === "text")
+        .map((b: { text?: string }) => b.text || "")
+        .join("") || "No response";
 
     // 8. Store assistant message
     const { error: asstErr } = await supabase
