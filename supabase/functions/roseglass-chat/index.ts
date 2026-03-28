@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 1. Get conversation history for τ calculation
+    // 1. Get conversation history + accumulated τ across sessions
     const { data: history } = await supabase
       .from("chat_messages")
       .select("role, content, created_at")
@@ -293,7 +293,34 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: true });
 
     const msgCount = history?.length || 0;
-    const tau = Math.min(3.0, 0.5 + msgCount * 0.15);
+
+    // Accumulated τ (Phase 6 — WP-2026-007)
+    // Query cross-session readings for the same user (via api_key_id)
+    let accumulatedTau = 0;
+    const { data: session } = await supabase
+      .from("db_sessions")
+      .select("api_key_id")
+      .eq("id", session_id)
+      .single();
+
+    if (session?.api_key_id) {
+      // Get all sibling sessions for this user
+      const { data: siblingReadings } = await supabase
+        .rpc("get_accumulated_tau", { p_api_key_id: session.api_key_id, p_current_session: session_id })
+        .maybeSingle();
+
+      if (siblingReadings) {
+        // accumulated τ from prior sessions
+        const totalReadings = siblingReadings.total_readings || 0;
+        const daysSinceLastSeen = siblingReadings.days_since_last || 999;
+        const recencyWeight = Math.max(0.1, 1.0 - daysSinceLastSeen * 0.05);
+        accumulatedTau = Math.log(1 + totalReadings) * recencyWeight * 0.3;
+      }
+    }
+
+    // τ = session depth + accumulated cross-session depth, capped at 3.0
+    const sessionTau = 0.5 + msgCount * 0.15;
+    const tau = Math.min(3.0, sessionTau + accumulatedTau);
 
     // 2. Compute C(x) — try real Python nematocysts, fall back to browser-side
     let cxReading: CxReading;
