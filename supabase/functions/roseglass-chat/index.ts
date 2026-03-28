@@ -5,8 +5,8 @@
  * builds system prompt with topology injection → calls Anthropic →
  * stores response → returns content + topology.
  *
- * Phase 2: Uses browser-side compute (Option C) for C(x).
- * Phase 3 will wire to real Python nematocysts via CERATA bridge.
+ * Phase 3: Calls real Python nematocysts via CERATA API when available,
+ * falls back to browser-side compute (Option C) when unreachable.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -14,6 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const CERATA_API_URL = Deno.env.get("CERATA_API_URL") || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -294,8 +295,43 @@ Deno.serve(async (req) => {
     const msgCount = history?.length || 0;
     const tau = Math.min(3.0, 0.5 + msgCount * 0.15);
 
-    // 2. Compute C(x) — Option C browser-side for now
-    const cxReading = computeCxBrowserSide(message, tau);
+    // 2. Compute C(x) — try real Python nematocysts, fall back to browser-side
+    let cxReading: CxReading;
+    let computeSource = "browser-side";
+
+    if (CERATA_API_URL) {
+      try {
+        const cerataRes = await fetch(`${CERATA_API_URL}/cx`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: message, tau, lambda: 1.0 }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (cerataRes.ok) {
+          const cerataData = await cerataRes.json();
+          if (cerataData.success) {
+            cxReading = {
+              Cx: cerataData.Cx,
+              tau: cerataData.tau,
+              lambda: cerataData.lambda,
+              veritas_ratio: cerataData.veritas_ratio,
+              has_dark_spot: cerataData.has_dark_spot,
+              zones: cerataData.zones,
+            };
+            computeSource = "python-nematocysts";
+          } else {
+            cxReading = computeCxBrowserSide(message, tau);
+          }
+        } else {
+          cxReading = computeCxBrowserSide(message, tau);
+        }
+      } catch {
+        // Timeout or network error — fall back silently
+        cxReading = computeCxBrowserSide(message, tau);
+      }
+    } else {
+      cxReading = computeCxBrowserSide(message, tau);
+    }
 
     // 3. Store user message
     const { data: msgRow } = await supabase
@@ -370,6 +406,7 @@ Deno.serve(async (req) => {
         content: assistantContent,
         cx: cxReading,
         tau,
+        compute_source: computeSource,
       }),
       {
         headers: {
