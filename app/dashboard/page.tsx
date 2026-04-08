@@ -10,38 +10,38 @@ const supabase = createClient(
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#07090f}
-  .page{min-height:100vh;background:#07090f;color:#c4c8d4}
-  .header{border-bottom:1px solid rgba(180,150,90,0.12);padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(7,9,15,0.96);backdrop-filter:blur(12px)}
-  .mark{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;color:#c8a96e}
+  body{background:#faf8f4}
+  .page{min-height:100vh;background:#faf8f4;color:#2a2520}
+  .header{border-bottom:1px solid #e8e2d8;padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(250,248,244,0.97);backdrop-filter:blur(12px)}
+  .mark{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:400;letter-spacing:0.25em;text-transform:uppercase;color:#6b5d3e}
   .nav-links{display:flex;gap:1.5rem;align-items:center}
-  .nav-link{font-family:'JetBrains Mono',monospace;font-size:0.6rem;letter-spacing:0.15em;color:#3a3f50;text-decoration:none;cursor:pointer;background:none;border:none;transition:color 0.15s}
-  .nav-link:hover{color:#c8a96e}
+  .nav-link{font-family:'JetBrains Mono',monospace;font-size:0.6rem;letter-spacing:0.15em;color:#8a8070;text-decoration:none;cursor:pointer;background:none;border:none;transition:color 0.15s}
+  .nav-link:hover{color:#6b5d3e}
   .main{max-width:780px;margin:0 auto;padding:3rem 2rem}
-  .section-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:1rem}
-  .card{border:1px solid rgba(180,150,90,0.1);padding:1.75rem;margin-bottom:1.5rem;background:rgba(255,255,255,0.01)}
-  .card-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:#d0c898;margin-bottom:0.4rem}
-  .card-meta{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.08em;line-height:1.9;margin-bottom:1.2rem}
-  .key-box{background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.15);padding:0.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:#c8a96e;letter-spacing:0.05em;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:0.75rem;word-break:break-all}
-  .copy-btn{background:none;border:1px solid rgba(200,169,110,0.2);color:#c8a96e;padding:0.3rem 0.7rem;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.15em;white-space:nowrap;flex-shrink:0;transition:all 0.15s}
-  .copy-btn:hover{background:rgba(200,169,110,0.07)}
-  .key-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em;line-height:1.7}
-  .token-bar-wrap{height:4px;background:rgba(255,255,255,0.04);margin:1rem 0;border-radius:2px;overflow:hidden}
-  .token-bar{height:100%;background:#c8a96e;border-radius:2px;transition:width 0.5s}
-  .token-bar.unlimited{width:100%;background:rgba(200,169,110,0.4)}
-  .plan-badge{display:inline-block;padding:0.2rem 0.6rem;border:1px solid rgba(200,169,110,0.25);font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;color:#c8a96e;margin-left:0.5rem}
-  .plan-badge.trial{border-color:rgba(180,150,90,0.15);color:#5a6070}
-  .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s}
-  .rg-btn:hover:not(:disabled){background:rgba(200,169,110,0.07)}
-  .rg-btn:disabled{border-color:#252a35;color:#252a35;cursor:not-allowed}
+  .section-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#b0a890;text-transform:uppercase;margin-bottom:1rem}
+  .card{border:1px solid #e0d8c8;padding:1.75rem;margin-bottom:1.5rem;background:#fff}
+  .card-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:#4a4030;margin-bottom:0.4rem}
+  .card-meta{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#8a8070;letter-spacing:0.08em;line-height:1.9;margin-bottom:1.2rem}
+  .key-box{background:#faf8f4;border:1px solid #e0d8c8;padding:0.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:#8b6f3a;letter-spacing:0.05em;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:0.75rem;word-break:break-all}
+  .copy-btn{background:none;border:1px solid #d0c8b8;color:#6b5d3e;padding:0.3rem 0.7rem;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.15em;white-space:nowrap;flex-shrink:0;transition:all 0.15s}
+  .copy-btn:hover{background:rgba(139,111,58,0.06)}
+  .key-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#b0a890;letter-spacing:0.08em;line-height:1.7}
+  .token-bar-wrap{height:4px;background:#e8e2d8;margin:1rem 0;border-radius:2px;overflow:hidden}
+  .token-bar{height:100%;background:#8b6f3a;border-radius:2px;transition:width 0.5s}
+  .token-bar.unlimited{width:100%;background:rgba(139,111,58,0.35)}
+  .plan-badge{display:inline-block;padding:0.2rem 0.6rem;border:1px solid #d0c8b8;font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;color:#8b6f3a;margin-left:0.5rem}
+  .plan-badge.trial{border-color:#e0d8c8;color:#8a8070}
+  .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #8b6f3a;color:#8b6f3a;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s}
+  .rg-btn:hover:not(:disabled){background:rgba(139,111,58,0.06)}
+  .rg-btn:disabled{border-color:#d0c8b8;color:#d0c8b8;cursor:not-allowed}
   .btn-row{display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-top:1rem}
   .msg{padding:0.5rem 0.75rem;margin-top:0.75rem;font-family:'JetBrains Mono',monospace;font-size:0.62rem;line-height:1.6}
-  .msg.ok{background:rgba(60,120,60,0.06);border:1px solid rgba(60,120,60,0.2);color:#70a870}
-  .msg.err{background:rgba(180,60,60,0.06);border:1px solid rgba(180,60,60,0.18);color:#b06060}
+  .msg.ok{background:rgba(60,120,60,0.06);border:1px solid rgba(60,120,60,0.15);color:#4a8a40}
+  .msg.err{background:rgba(180,60,60,0.04);border:1px solid rgba(180,60,60,0.15);color:#a04040}
   .cost-table{width:100%;border-collapse:collapse;margin-top:0.5rem}
-  .cost-table td{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#5a6070;padding:0.45rem 0;border-bottom:1px solid rgba(180,150,90,0.05);letter-spacing:0.05em}
-  .cost-table td:first-child{color:#9a9880;width:40%}
-  .loading{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#252a35;letter-spacing:0.15em;padding:3rem 2rem}
+  .cost-table td{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#7a7060;padding:0.45rem 0;border-bottom:1px solid #ede8df;letter-spacing:0.05em}
+  .cost-table td:first-child{color:#4a4030;width:40%}
+  .loading{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#b0a890;letter-spacing:0.15em;padding:3rem 2rem}
 `;
 
 type AccountData = {
@@ -110,7 +110,7 @@ export default function DashboardPage() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     localStorage.removeItem("rgd_api_key");
-    window.location.href = "/login";
+    window.location.href = "/";
   }
 
   function copyKey() {
@@ -131,7 +131,7 @@ export default function DashboardPage() {
       <header className="header">
         <div className="mark">Rose Glass</div>
         <nav className="nav-links">
-          <a className="nav-link" href="/">Analyze</a>
+          <a className="nav-link" href="/app">Analyze</a>
           <button className="nav-link" onClick={handleSignOut}>Sign out</button>
         </nav>
       </header>
@@ -181,7 +181,7 @@ export default function DashboardPage() {
                   <button className="rg-btn" onClick={handleUpgrade} disabled={upgrading}>
                     {upgrading ? "Redirecting…" : "Upgrade to Pro →"}
                   </button>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#3a3f50" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#8a8070" }}>
                     Unlimited tokens · $4/month
                   </span>
                 </div>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
 
             {isPro && (
               <div className="btn-row">
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", color: "#5a6070" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", color: "#7a7060" }}>
                   Pro plan active. Unlimited API access.
                 </span>
               </div>
