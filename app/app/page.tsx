@@ -19,21 +19,21 @@ function renderMarkdown(text: string): string {
   // Code blocks
   let html = text.replace(/```[\s\S]*?```/g, (match) => {
     const inner = match.slice(3, -3).replace(/^\w*\n/, "");
-    return `<pre style="background:rgba(255,255,255,0.03);border:1px solid rgba(180,150,90,0.08);padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;overflow-x:auto;margin:0.5rem 0;color:#8a8f9a;line-height:1.6">${inner.replace(/</g,"&lt;")}</pre>`;
+    return `<pre style="background:rgba(0,0,0,0.02);border:1px solid #e8e2d8;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;overflow-x:auto;margin:0.5rem 0;color:#8a8f9a;line-height:1.6">${inner.replace(/</g,"&lt;")}</pre>`;
   });
   // Inline code
   html = html.replace(/`([^`]+)`/g,
-    '<code style="background:rgba(255,255,255,0.04);padding:0.1rem 0.35rem;font-family:\'JetBrains Mono\',monospace;font-size:0.82em;color:#c8a96e">$1</code>');
+    '<code style="background:rgba(0,0,0,0.03);padding:0.1rem 0.35rem;font-family:\'JetBrains Mono\',monospace;font-size:0.82em;color:#8b6f3a">$1</code>');
   // Bold
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   // Italic
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
   // Bullet lists
   html = html.replace(/^[-•]\s+(.+)$/gm,
-    '<div style="padding-left:1rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0.2rem;color:#5a6070">·</span>$1</div>');
+    '<div style="padding-left:1rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0.2rem;color:#6b5d3e">·</span>$1</div>');
   // Numbered lists
   html = html.replace(/^(\d+)\.\s+(.+)$/gm,
-    '<div style="padding-left:1.2rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0;color:#5a6070;font-size:0.85em">$1.</span>$2</div>');
+    '<div style="padding-left:1.2rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0;color:#6b5d3e;font-size:0.85em">$1.</span>$2</div>');
   // Line breaks (double newline = paragraph, single = br)
   html = html.replace(/\n\n+/g, '<div style="height:0.6rem"></div>');
   html = html.replace(/\n/g, "<br/>");
@@ -233,94 +233,94 @@ export default function Home() {
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#07090f}
-    .rg-header{border-bottom:1px solid rgba(180,150,90,0.12);padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(7,9,15,0.96);backdrop-filter:blur(12px)}
-    .rg-mark{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;color:#c8a96e}
-    .rg-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.3em;color:#2a2f3a;text-transform:uppercase}
+    body{background:#faf8f4}
+    .rg-header{border-bottom:1px solid #e8e2d8;padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(250,248,244,0.97);backdrop-filter:blur(12px)}
+    .rg-mark{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:400;letter-spacing:0.25em;text-transform:uppercase;color:#6b5d3e}
+    .rg-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#b0a890;text-transform:uppercase}
     .home{max-width:880px;margin:0 auto;padding:4rem 2rem}
-    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#e8dfc8;margin-bottom:1.5rem;letter-spacing:0.02em;animation:fadeUp 0.6s ease both}
-    .home-lede em{color:#c8a96e;font-style:italic}
-    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif;animation:fadeUp 0.6s ease 0.1s both}
+    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#2a2520;margin-bottom:1.5rem;letter-spacing:0.02em;animation:fadeUp 0.6s ease both}
+    .home-lede em{color:#8b6f3a;font-style:italic}
+    .home-sub{font-size:0.95rem;line-height:1.85;color:#6b5d3e;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif;animation:fadeUp 0.6s ease 0.1s both}
     @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    .how-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(180,150,90,0.06);border:1px solid rgba(180,150,90,0.06);margin-bottom:3rem;animation:fadeUp 0.6s ease 0.2s both}
-    .how-card{background:#07090f;padding:1.3rem;text-align:left}
-    .how-num{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:#3a3f50;letter-spacing:0.2em;margin-bottom:0.5rem}
-    .how-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.3rem}
-    .how-desc{font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:#3a3f50;letter-spacing:0.06em;line-height:1.7}
-    .tab-row{display:flex;gap:0;margin-bottom:2rem;border-bottom:1px solid rgba(180,150,90,0.1)}
-    .tab{padding:0.6rem 1.4rem;background:none;border:none;border-bottom:2px solid transparent;color:#3a3f50;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;transition:all 0.15s;margin-bottom:-1px}
+    .how-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#ede8df;border:1px solid #ede8df;margin-bottom:3rem;animation:fadeUp 0.6s ease 0.2s both}
+    .how-card{background:#faf8f4;padding:1.3rem;text-align:left}
+    .how-num{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:#8a8070;letter-spacing:0.2em;margin-bottom:0.5rem}
+    .how-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#4a4030;margin-bottom:0.3rem}
+    .how-desc{font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:#8a8070;letter-spacing:0.06em;line-height:1.7}
+    .tab-row{display:flex;gap:0;margin-bottom:2rem;border-bottom:1px solid #e8e2d8}
+    .tab{padding:0.6rem 1.4rem;background:none;border:none;border-bottom:2px solid transparent;color:#8a8070;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;transition:all 0.15s;margin-bottom:-1px}
     .tab:hover{color:#7a7f8a}
-    .tab.active{color:#c8a96e;border-bottom-color:#c8a96e}
-    .preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1px;background:rgba(180,150,90,0.08);border:1px solid rgba(180,150,90,0.08);margin-bottom:2.5rem}
-    .preset-card{background:#07090f;padding:1.5rem;cursor:pointer;transition:background 0.2s;border:none;text-align:left;color:inherit;width:100%}
-    .preset-card:hover{background:rgba(200,169,110,0.04)}
+    .tab.active{color:#8b6f3a;border-bottom-color:#8b6f3a}
+    .preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1px;background:#e8e2d8;border:1px solid #e8e2d8;margin-bottom:2.5rem}
+    .preset-card{background:#faf8f4;padding:1.5rem;cursor:pointer;transition:background 0.2s;border:none;text-align:left;color:inherit;width:100%}
+    .preset-card:hover{background:rgba(139,111,58,0.03)}
     .preset-card:disabled{opacity:0.35;cursor:not-allowed}
-    .pc-label{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:#d4c8a0;margin-bottom:0.4rem}
-    .pc-desc{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#3a3f50;letter-spacing:0.08em;line-height:1.6}
-    .pc-cta{font-size:0.75rem;color:#c8a96e;opacity:0;transition:opacity 0.2s;margin-top:0.6rem;display:block;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em}
+    .pc-label{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:#4a4030;margin-bottom:0.4rem}
+    .pc-desc{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#8a8070;letter-spacing:0.08em;line-height:1.6}
+    .pc-cta{font-size:0.75rem;color:#8b6f3a;opacity:0;transition:opacity 0.2s;margin-top:0.6rem;display:block;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em}
     .preset-card:hover .pc-cta{opacity:1}
     .custom-row{display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:3rem}
-    .field-label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#2a2f3a;text-transform:uppercase;display:block;margin-bottom:0.35rem}
-    .field-input{background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;outline:none;width:260px;transition:border-color 0.2s}
-    .field-input:focus{border-color:rgba(200,169,110,0.35)}
+    .field-label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#b0a890;text-transform:uppercase;display:block;margin-bottom:0.35rem}
+    .field-input{background:rgba(0,0,0,0.02);border:1px solid rgba(139,111,58,0.12);color:#2a2520;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;outline:none;width:260px;transition:border-color 0.2s}
+    .field-input:focus{border-color:#8b6f3a}
     .field-input.short{width:100px}
     .field-input.wide{width:480px}
-    .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
-    .rg-btn:hover:not(:disabled){background:rgba(200,169,110,0.07)}
-    .rg-btn:disabled{border-color:#252a35;color:#252a35;cursor:not-allowed}
-    .upload-zone{border:1px dashed rgba(180,150,90,0.2);padding:2.5rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem;background:rgba(255,255,255,0.01)}
-    .upload-zone:hover{border-color:rgba(200,169,110,0.4);background:rgba(200,169,110,0.02)}
-    .upload-zone.has-file{border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.03)}
+    .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #8b6f3a;color:#8b6f3a;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
+    .rg-btn:hover:not(:disabled){background:rgba(139,111,58,0.05)}
+    .rg-btn:disabled{border-color:#d0c8b8;color:#d0c8b8;cursor:not-allowed}
+    .upload-zone{border:1px dashed rgba(180,150,90,0.2);padding:2.5rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem;background:rgba(0,0,0,0.01)}
+    .upload-zone:hover{border-color:#8b6f3a;background:rgba(139,111,58,0.02)}
+    .upload-zone.has-file{border-color:#8b6f3a;background:rgba(139,111,58,0.03)}
     .uz-icon{font-size:1.8rem;margin-bottom:0.6rem;opacity:0.4}
-    .uz-label{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#9a9880;margin-bottom:0.3rem}
-    .uz-sub{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#3a3f50;letter-spacing:0.1em}
-    .uz-filename{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#c8a96e;margin-top:0.5rem}
+    .uz-label{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#6b5d3e;margin-bottom:0.3rem}
+    .uz-sub{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#8a8070;letter-spacing:0.1em}
+    .uz-filename{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#8b6f3a;margin-top:0.5rem}
     .pg-form{display:flex;flex-direction:column;gap:1rem;max-width:560px;margin-bottom:2rem}
-    .pg-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em;line-height:1.7;margin-top:-0.3rem}
-    .prior-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.9rem}
+    .pg-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#d0c8b8;letter-spacing:0.08em;line-height:1.7;margin-top:-0.3rem}
+    .prior-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#d0c8b8;text-transform:uppercase;margin-bottom:0.9rem}
     .prior-list{display:flex;flex-direction:column;gap:1px}
-    .prior-item{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.06);cursor:pointer;transition:background 0.15s}
-    .prior-item:hover{background:rgba(200,169,110,0.03)}
-    .prior-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:#9a9880}
-    .prior-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em}
+    .prior-item{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;background:rgba(0,0,0,0.01);border:1px solid #ede8df;cursor:pointer;transition:background 0.15s}
+    .prior-item:hover{background:rgba(139,111,58,0.03)}
+    .prior-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:#6b5d3e}
+    .prior-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#d0c8b8;letter-spacing:0.08em}
     .connector-badge{font-size:0.5rem;padding:0.15rem 0.4rem;border:1px solid rgba(180,150,90,0.15);color:#3a4050;font-family:'JetBrains Mono',monospace;letter-spacing:0.15em;text-transform:uppercase;margin-right:0.5rem}
     .connecting{max-width:600px;margin:0 auto;padding:7rem 2rem;text-align:center}
-    .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#c8a96e;margin-bottom:1rem;font-weight:300}
-    .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.2em;animation:blink 1.4s infinite}
+    .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#8b6f3a;margin-bottom:1rem;font-weight:300}
+    .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#8a8070;letter-spacing:0.2em;animation:blink 1.4s infinite}
     .conn-steps{margin-top:2rem;display:flex;flex-direction:column;gap:0.5rem;text-align:left;max-width:340px;margin-left:auto;margin-right:auto}
-    .conn-step{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.1em;padding:0.35rem 0;border-bottom:1px solid rgba(180,150,90,0.04)}
+    .conn-step{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#d0c8b8;letter-spacing:0.1em;padding:0.35rem 0;border-bottom:1px solid #ede8df}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
     .chat-wrap{display:flex;height:calc(100vh - 54px)}
-    .sidebar{width:280px;flex-shrink:0;border-right:1px solid rgba(180,150,90,0.08);padding:1.5rem 1.25rem;overflow-y:auto;background:#07090f;scrollbar-width:thin;scrollbar-color:rgba(180,150,90,0.1) transparent}
+    .sidebar{width:280px;flex-shrink:0;border-right:1px solid #e8e2d8;padding:1.5rem 1.25rem;overflow-y:auto;background:#f5f2ed;scrollbar-width:thin;scrollbar-color:rgba(139,111,58,0.15) transparent}
     .sidebar::-webkit-scrollbar{width:4px}
     .sidebar::-webkit-scrollbar-track{background:transparent}
     .sidebar::-webkit-scrollbar-thumb{background:rgba(180,150,90,0.15);border-radius:2px}
-    .sb-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.4rem}
-    .sb-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#2a2f3a;letter-spacing:0.08em;line-height:1.9}
-    .sb-hr{border:none;border-top:1px solid rgba(180,150,90,0.07);margin:1.2rem 0}
-    .sb-section{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.7rem}
-    .starter{display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:3px;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.05);color:#5a6070;cursor:pointer;font-family:'Georgia',serif;font-size:0.78rem;line-height:1.4;transition:all 0.15s}
-    .starter:hover{border-color:rgba(200,169,110,0.15);color:#9a9880}
-    .back{margin-top:1.2rem;padding:0.4rem 0;background:none;border:none;color:#252a35;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:color 0.15s}
-    .back:hover{color:#c8a96e}
+    .sb-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#4a4030;margin-bottom:0.4rem}
+    .sb-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#b0a890;letter-spacing:0.08em;line-height:1.9}
+    .sb-hr{border:none;border-top:1px solid #e0d8c8;margin:1.2rem 0}
+    .sb-section{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#d0c8b8;text-transform:uppercase;margin-bottom:0.7rem}
+    .starter{display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:3px;background:rgba(0,0,0,0.01);border:1px solid #ede8df;color:#6b5d3e;cursor:pointer;font-family:'Georgia',serif;font-size:0.78rem;line-height:1.4;transition:all 0.15s}
+    .starter:hover{border-color:#d0c8b8;color:#6b5d3e}
+    .back{margin-top:1.2rem;padding:0.4rem 0;background:none;border:none;color:#d0c8b8;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:color 0.15s}
+    .back:hover{color:#8b6f3a}
     .chat-main{flex:1;display:flex;flex-direction:column;min-width:0}
     .messages{flex:1;overflow-y:auto;padding:2rem;display:flex;flex-direction:column;gap:1.5rem}
     .msg{max-width:740px;line-height:1.75}
-    .msg-user{align-self:flex-end;background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.1);padding:0.7rem 1.2rem;font-size:0.95rem;color:#c4c8d4;font-family:'Georgia',serif}
-    .msg-assistant{align-self:flex-start;font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#a8acb8}
-    .msg-assistant strong{color:#d0c898;font-weight:500}
-    .msg-assistant em{color:#c8a96e;font-style:italic}
-    .input-row{border-top:1px solid rgba(180,150,90,0.08);padding:1.2rem 2rem;display:flex;gap:0.75rem;align-items:flex-end;background:rgba(7,9,15,0.97)}
-    .chat-input{flex:1;background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.7rem 1rem;font-family:'Georgia',serif;font-size:0.93rem;outline:none;resize:none;min-height:46px;max-height:160px;line-height:1.5;transition:border-color 0.2s}
-    .chat-input:focus{border-color:rgba(200,169,110,0.3)}
-    .chat-input::placeholder{color:#252a35;font-style:italic}
-    .err{background:rgba(180,60,60,0.06);border:1px solid rgba(180,60,60,0.18);padding:0.7rem 1rem;margin-bottom:1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:#b06060}
-    .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c8a96e;margin:0 2px;animation:dot 1.2s infinite}
+    .msg-user{align-self:flex-end;background:rgba(139,111,58,0.04);border:1px solid #e0d8c8;padding:0.7rem 1.2rem;font-size:0.95rem;color:#2a2520;font-family:'Georgia',serif}
+    .msg-assistant{align-self:flex-start;font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#4a4030}
+    .msg-assistant strong{color:#4a4030;font-weight:500}
+    .msg-assistant em{color:#8b6f3a;font-style:italic}
+    .input-row{border-top:1px solid #e8e2d8;padding:1.2rem 2rem;display:flex;gap:0.75rem;align-items:flex-end;background:rgba(250,248,244,0.97)}
+    .chat-input{flex:1;background:rgba(0,0,0,0.02);border:1px solid rgba(139,111,58,0.12);color:#2a2520;padding:0.7rem 1rem;font-family:'Georgia',serif;font-size:0.93rem;outline:none;resize:none;min-height:46px;max-height:160px;line-height:1.5;transition:border-color 0.2s}
+    .chat-input:focus{border-color:#8b6f3a}
+    .chat-input::placeholder{color:#d0c8b8;font-style:italic}
+    .err{background:rgba(180,60,60,0.04);border:1px solid rgba(180,60,60,0.15);padding:0.7rem 1rem;margin-bottom:1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:#a04040}
+    .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#8b6f3a;margin:0 2px;animation:dot 1.2s infinite}
     .dots span:nth-child(2){animation-delay:0.2s}.dots span:nth-child(3){animation-delay:0.4s}
     @keyframes dot{0%,80%,100%{transform:scale(0.6);opacity:0.3}40%{transform:scale(1);opacity:1}}
     @media(max-width:768px){
       .chat-wrap{flex-direction:column}
-      .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid rgba(180,150,90,0.08)}
+      .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid #e8e2d8}
       .home-lede{font-size:1.8rem}
       .preset-grid{grid-template-columns:1fr}
       .how-row{grid-template-columns:1fr}
@@ -341,13 +341,13 @@ export default function Home() {
     : "fetching variable manifest · profiling concepts · detecting absences";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07090f", color: "#c4c8d4" }}>
+    <div style={{ minHeight: "100vh", background: "#faf8f4", color: "#2a2520" }}>
       <style>{CSS}</style>
       <header className="rg-header">
         <div className="rg-mark" style={{display:"flex",alignItems:"center",gap:"12px"}}><img src="/logo.png" alt="Rose Glass Data" style={{height:"48px",width:"48px",borderRadius:"8px"}} />Rose Glass Data</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <div className="rg-tag">Translation · Not Judgment</div>
-          <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#3a3f50" : "#c8a96e", textDecoration: "none", border: hasKey ? "none" : "1px solid rgba(200,169,110,0.35)", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>
+          <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#8a8070" : "#8b6f3a", textDecoration: "none", border: hasKey ? "none" : "1px solid #8b6f3a", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>
             {hasKey ? "Account" : "Sign In · Register"}
           </a>
         </div>
@@ -358,14 +358,14 @@ export default function Home() {
           <h1 className="home-lede">What does this database <em>believe</em><br />about the world it measures?</h1>
           <p className="home-sub">Connect a public dataset or upload your own. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts.</p>
           {!hasKey && (
-            <div style={{ background: "rgba(200,169,110,0.04)", border: "1px solid rgba(200,169,110,0.2)", padding: "1.5rem 2rem", marginBottom: "2.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+            <div style={{ background: "rgba(139,111,58,0.03)", border: "1px solid rgba(200,169,110,0.2)", padding: "1.5rem 2rem", marginBottom: "2.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
               <div>
-                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.1rem", color: "#d4c8a0", marginBottom: "0.3rem" }}>Create a free account to get started</div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#3a3f50", letterSpacing: "0.1em", lineHeight: 1.7 }}>10,000 free tokens · no credit card required · upgrade anytime</div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.1rem", color: "#4a4030", marginBottom: "0.3rem" }}>Create a free account to get started</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#8a8070", letterSpacing: "0.1em", lineHeight: 1.7 }}>10,000 free tokens · no credit card required · upgrade anytime</div>
               </div>
               <div style={{ display: "flex", gap: "0.75rem" }}>
-                <a href="/login?tab=signup" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid #c8a96e", color: "#c8a96e", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Create account</a>
-                <a href="/login" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid rgba(180,150,90,0.2)", color: "#5a6070", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Sign in</a>
+                <a href="/login?tab=signup" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid #8b6f3a", color: "#8b6f3a", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Create account</a>
+                <a href="/login" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid rgba(180,150,90,0.2)", color: "#6b5d3e", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Sign in</a>
               </div>
             </div>
           )}
@@ -437,7 +437,7 @@ export default function Home() {
               <button className="rg-btn" onClick={uploadCSV} disabled={!uploadFile || uploading}>
                 {uploading ? "Profiling…" : "Profile this dataset →"}
               </button>
-              <p style={{ marginTop: "1rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#252a35", lineHeight: 1.7 }}>
+              <p style={{ marginTop: "1rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#d0c8b8", lineHeight: 1.7 }}>
                 Rose Glass will read your column structure, infer what domains are present, detect what is absent, and open a conversation about what the dataset believes about the world it measures.
               </p>
             </div>
