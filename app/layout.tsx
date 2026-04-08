@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/logo-192.png",
   },
-  title: "Rose Glass",
-  description: "IPAI Dimensional News Analysis Platform",
+  title: "Rose Glass Data",
+  description: "What does this dataset believe about the world it measures? Semantic data profiling with structural absence detection.",
 };
 
 export default function RootLayout({

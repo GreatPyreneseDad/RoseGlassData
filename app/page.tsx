@@ -4,6 +4,7 @@ import InferenceMap from "./components/InferenceMap";
 import SemanticProfile from "./components/SemanticProfile";
 import CoherenceScore from "./components/CoherenceScore";
 import CoachPanel, { type Recommendation } from "./components/CoachPanel";
+import SidebarCollapse from "./components/SidebarCollapse";
 
 function getApiKey(): string {
   if (typeof window === "undefined") return "";
@@ -12,6 +13,31 @@ function getApiKey(): string {
 function apiHeaders(extra?: Record<string, string>): Record<string, string> {
   const key = getApiKey();
   return { ...(key ? { "X-Api-Key": key } : {}), ...extra };
+}
+
+function renderMarkdown(text: string): string {
+  // Code blocks
+  let html = text.replace(/```[\s\S]*?```/g, (match) => {
+    const inner = match.slice(3, -3).replace(/^\w*\n/, "");
+    return `<pre style="background:rgba(255,255,255,0.03);border:1px solid rgba(180,150,90,0.08);padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;overflow-x:auto;margin:0.5rem 0;color:#8a8f9a;line-height:1.6">${inner.replace(/</g,"&lt;")}</pre>`;
+  });
+  // Inline code
+  html = html.replace(/`([^`]+)`/g,
+    '<code style="background:rgba(255,255,255,0.04);padding:0.1rem 0.35rem;font-family:\'JetBrains Mono\',monospace;font-size:0.82em;color:#c8a96e">$1</code>');
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // Bullet lists
+  html = html.replace(/^[-•]\s+(.+)$/gm,
+    '<div style="padding-left:1rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0.2rem;color:#5a6070">·</span>$1</div>');
+  // Numbered lists
+  html = html.replace(/^(\d+)\.\s+(.+)$/gm,
+    '<div style="padding-left:1.2rem;margin:0.15rem 0;position:relative"><span style="position:absolute;left:0;color:#5a6070;font-size:0.85em">$1.</span>$2</div>');
+  // Line breaks (double newline = paragraph, single = br)
+  html = html.replace(/\n\n+/g, '<div style="height:0.6rem"></div>');
+  html = html.replace(/\n/g, "<br/>");
+  return html;
 }
 
 type Session = {
@@ -251,9 +277,14 @@ export default function Home() {
     .connecting{max-width:600px;margin:0 auto;padding:7rem 2rem;text-align:center}
     .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#c8a96e;margin-bottom:1rem;font-weight:300}
     .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.2em;animation:blink 1.4s infinite}
+    .conn-steps{margin-top:2rem;display:flex;flex-direction:column;gap:0.5rem;text-align:left;max-width:340px;margin-left:auto;margin-right:auto}
+    .conn-step{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.1em;padding:0.35rem 0;border-bottom:1px solid rgba(180,150,90,0.04)}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
     .chat-wrap{display:flex;height:calc(100vh - 54px)}
-    .sidebar{width:255px;flex-shrink:0;border-right:1px solid rgba(180,150,90,0.08);padding:1.5rem 1.25rem;overflow-y:auto;background:#07090f}
+    .sidebar{width:280px;flex-shrink:0;border-right:1px solid rgba(180,150,90,0.08);padding:1.5rem 1.25rem;overflow-y:auto;background:#07090f;scrollbar-width:thin;scrollbar-color:rgba(180,150,90,0.1) transparent}
+    .sidebar::-webkit-scrollbar{width:4px}
+    .sidebar::-webkit-scrollbar-track{background:transparent}
+    .sidebar::-webkit-scrollbar-thumb{background:rgba(180,150,90,0.15);border-radius:2px}
     .sb-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.4rem}
     .sb-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#2a2f3a;letter-spacing:0.08em;line-height:1.9}
     .sb-hr{border:none;border-top:1px solid rgba(180,150,90,0.07);margin:1.2rem 0}
@@ -277,6 +308,15 @@ export default function Home() {
     .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c8a96e;margin:0 2px;animation:dot 1.2s infinite}
     .dots span:nth-child(2){animation-delay:0.2s}.dots span:nth-child(3){animation-delay:0.4s}
     @keyframes dot{0%,80%,100%{transform:scale(0.6);opacity:0.3}40%{transform:scale(1);opacity:1}}
+    @media(max-width:768px){
+      .chat-wrap{flex-direction:column}
+      .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid rgba(180,150,90,0.08)}
+      .home-lede{font-size:1.8rem}
+      .preset-grid{grid-template-columns:1fr}
+      .custom-row{flex-direction:column}
+      .field-input,.field-input.wide{width:100%}
+      .rg-header{padding:0.8rem 1rem}
+    }
   `;
 
   const connectingLabel = homeTab === "upload"
@@ -408,6 +448,25 @@ export default function Home() {
         <div className="connecting">
           <div className="conn-title">{connectingLabel}</div>
           <div className="conn-sub">{connectingSub}</div>
+          <div className="conn-steps">
+            {homeTab === "upload" ? (<>
+              <div className="conn-step">↳ parsing column headers and sample values</div>
+              <div className="conn-step">↳ inferring concept domains and data types</div>
+              <div className="conn-step">↳ running 6 classification agents in parallel</div>
+              <div className="conn-step">↳ synthesizing dataset-level profile</div>
+              <div className="conn-step">↳ detecting structural absences</div>
+            </>) : homeTab === "postgres" ? (<>
+              <div className="conn-step">↳ connecting to database</div>
+              <div className="conn-step">↳ reading public schema</div>
+              <div className="conn-step">↳ inferring concept domains</div>
+              <div className="conn-step">↳ detecting structural gaps</div>
+            </>) : (<>
+              <div className="conn-step">↳ fetching variable manifest from Census API</div>
+              <div className="conn-step">↳ profiling concept domains</div>
+              <div className="conn-step">↳ computing dimensional scores</div>
+              <div className="conn-step">↳ detecting structural absences</div>
+            </>)}
+          </div>
         </div>
       )}
 
@@ -421,31 +480,56 @@ export default function Home() {
               {activeSession.moe_coverage > 0 ? `${activeSession.moe_coverage}% error margin coverage` : ""}
             </div>
             <hr className="sb-hr" />
-            <div className="sb-section">Ask about</div>
-            {STARTERS.map(q => (
-              <button key={q} className="starter" onClick={() => setInput(q)}>{q}</button>
-            ))}
+            <SidebarCollapse title="Ask about" defaultOpen={true}>
+              {STARTERS.map(q => (
+                <button key={q} className="starter" onClick={() => setInput(q)}>{q}</button>
+              ))}
+            </SidebarCollapse>
             <hr className="sb-hr" />
             {activeSession.semantic_profile && (
-              <SemanticProfile profile={activeSession.semantic_profile} />
+              <SidebarCollapse title="Schema Coherence" defaultOpen={true}
+                badge={(() => {
+                  const cols = activeSession.semantic_profile?.semantic_columns || [];
+                  if (cols.length === 0) return undefined;
+                  const hp = cols.filter((c: SemanticColumn) => c.proxy_risk === "high" || c.proxy_risk === "moderate").length;
+                  return hp > 0 ? `${hp} risk` : undefined;
+                })()}>
+                <CoherenceScore
+                  profile={activeSession.semantic_profile}
+                  absences={activeSession.profile?.absences}
+                  onCoachRequest={requestCoaching}
+                />
+              </SidebarCollapse>
             )}
-            {activeSession.semantic_profile && <hr className="sb-hr" />}
+            {(coachLoading || coachRecs.length > 0) && (
+              <>
+                <hr className="sb-hr" />
+                <SidebarCollapse title="Schema Coach" defaultOpen={true}>
+                  <CoachPanel recommendations={coachRecs} loading={coachLoading} />
+                </SidebarCollapse>
+              </>
+            )}
             {activeSession.semantic_profile && (
-              <CoherenceScore
-                profile={activeSession.semantic_profile}
-                absences={activeSession.profile?.absences}
-                onCoachRequest={requestCoaching}
-              />
+              <>
+                <hr className="sb-hr" />
+                <SidebarCollapse title="Semantic Profile" defaultOpen={false}
+                  badge={`${activeSession.semantic_profile.semantic_columns?.length || 0} cols`}>
+                  <SemanticProfile profile={activeSession.semantic_profile} />
+                </SidebarCollapse>
+              </>
             )}
-            {(coachLoading || coachRecs.length > 0) && <hr className="sb-hr" />}
-            <CoachPanel recommendations={coachRecs} loading={coachLoading} />
-            {activeSession.semantic_profile && <hr className="sb-hr" />}
             {activeSession.profile?.absences?.length > 0 && (
-              <InferenceMap
-                absences={activeSession.profile.absences}
-                lens_summary={activeSession.profile.lens_summary}
-                datasetName={activeSession.name}
-              />
+              <>
+                <hr className="sb-hr" />
+                <SidebarCollapse title="Inference Map" defaultOpen={false}
+                  badge={`${activeSession.profile.absences.length} gaps`}>
+                  <InferenceMap
+                    absences={activeSession.profile.absences}
+                    lens_summary={activeSession.profile.lens_summary}
+                    datasetName={activeSession.name}
+                  />
+                </SidebarCollapse>
+              </>
             )}
             <hr className="sb-hr" />
             <button className="back" onClick={() => setStage("home")}>← New dataset</button>
@@ -453,11 +537,8 @@ export default function Home() {
           <div className="chat-main">
             <div className="messages">
               {messages.map((m, i) => (
-                <div key={i} className={`msg msg-${m.role}`}>
-                  {m.content.split("\n").map((line, j) => (
-                    <span key={j} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>") }} style={{ display: "block" }} />
-                  ))}
-                </div>
+                <div key={i} className={`msg msg-${m.role}`}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
               ))}
               {sending && <div className="msg msg-assistant"><div className="dots"><span/><span/><span/></div></div>}
               <div ref={chatEndRef} />
