@@ -10,24 +10,24 @@ const supabase = createClient(
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#07090f}
-  .wrap{min-height:100vh;background:#07090f;color:#c4c8d4;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
-  .card{width:100%;max-width:420px;border:1px solid rgba(180,150,90,0.12);padding:2.5rem;background:#07090f}
-  .mark{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;color:#c8a96e;margin-bottom:2rem;display:block}
-  .title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:#e8dfc8;margin-bottom:0.5rem}
-  .sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.12em;margin-bottom:2rem;line-height:1.7}
-  .tabs{display:flex;border-bottom:1px solid rgba(180,150,90,0.1);margin-bottom:1.8rem}
-  .tab{padding:0.5rem 1rem;background:none;border:none;border-bottom:2px solid transparent;color:#3a3f50;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:-1px;transition:all 0.15s}
-  .tab.active{color:#c8a96e;border-bottom-color:#c8a96e}
-  .label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#2a2f3a;text-transform:uppercase;display:block;margin-bottom:0.35rem}
-  .input{width:100%;background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.75rem;outline:none;margin-bottom:1rem;transition:border-color 0.2s}
-  .input:focus{border-color:rgba(200,169,110,0.35)}
-  .btn{width:100%;padding:0.7rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;margin-top:0.25rem}
-  .btn:hover:not(:disabled){background:rgba(200,169,110,0.07)}
-  .btn:disabled{border-color:#252a35;color:#252a35;cursor:not-allowed}
+  body{background:#faf8f4}
+  .wrap{min-height:100vh;background:#faf8f4;color:#2a2520;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+  .card{width:100%;max-width:420px;border:1px solid #e0d8c8;padding:2.5rem;background:#fff}
+  .mark{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:400;letter-spacing:0.25em;text-transform:uppercase;color:#6b5d3e;margin-bottom:2rem;display:block}
+  .title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:#2a2520;margin-bottom:0.5rem}
+  .sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#b0a890;letter-spacing:0.12em;margin-bottom:2rem;line-height:1.7}
+  .tabs{display:flex;border-bottom:1px solid #e8e2d8;margin-bottom:1.8rem}
+  .tab{padding:0.5rem 1rem;background:none;border:none;border-bottom:2px solid transparent;color:#b0a890;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:-1px;transition:all 0.15s}
+  .tab.active{color:#8b6f3a;border-bottom-color:#8b6f3a}
+  .label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#b0a890;text-transform:uppercase;display:block;margin-bottom:0.35rem}
+  .input{width:100%;background:#faf8f4;border:1px solid #e0d8c8;color:#2a2520;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.75rem;outline:none;margin-bottom:1rem;transition:border-color 0.2s}
+  .input:focus{border-color:#8b6f3a}
+  .btn{width:100%;padding:0.7rem;background:#2a2520;border:none;color:#faf8f4;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;margin-top:0.25rem}
+  .btn:hover:not(:disabled){background:#3d352a}
+  .btn:disabled{background:#d0c8b8;color:#faf8f4;cursor:not-allowed}
   .msg{padding:0.7rem;margin-top:1rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;line-height:1.7}
-  .msg.ok{background:rgba(60,120,60,0.06);border:1px solid rgba(60,120,60,0.2);color:#70a870}
-  .msg.err{background:rgba(180,60,60,0.06);border:1px solid rgba(180,60,60,0.18);color:#b06060}
+  .msg.ok{background:rgba(60,120,60,0.06);border:1px solid rgba(60,120,60,0.2);color:#4a8a40}
+  .msg.err{background:rgba(180,60,60,0.04);border:1px solid rgba(180,60,60,0.15);color:#a04040}
 `;
 
 export default function LoginPage() {
@@ -67,7 +67,7 @@ export default function LoginPage() {
           localStorage.setItem("rgd_plan", keyData.plan);
           localStorage.setItem("rgd_tokens", String(keyData.tokens_remaining));
         }
-        window.location.href = "/dashboard";
+        window.location.href = "/app";
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error";
