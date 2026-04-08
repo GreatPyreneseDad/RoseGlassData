@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import InferenceMap from "./components/InferenceMap";
 import SemanticProfile from "./components/SemanticProfile";
+import CoherenceScore from "./components/CoherenceScore";
+import CoachPanel, { type Recommendation } from "./components/CoachPanel";
 
 function getApiKey(): string {
   if (typeof window === "undefined") return "";
@@ -77,6 +79,8 @@ export default function Home() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [homeTab, setHomeTab] = useState<"census"|"upload"|"postgres">("census");
+  const [coachRecs, setCoachRecs] = useState<Recommendation[]>([]);
+  const [coachLoading, setCoachLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +143,7 @@ export default function Home() {
 
   function openSession(data: ConnectResult, name: string) {
     setActiveSession(data);
+    setCoachRecs([]);
     const rowNote = data.row_count ? ` across ${data.row_count.toLocaleString()} rows` : "";
     const tableNote = data.tables ? ` in ${data.tables.length} table${data.tables.length > 1 ? "s" : ""}` : "";
     setMessages([{ role: "assistant", content: `I've read the structure of **${data.name || name}**.\n\n${data.variable_count.toLocaleString()} variables across ${data.concept_count} concept domains${rowNote}${tableNote}. What do you want to understand about it?` }]);
@@ -171,10 +176,28 @@ export default function Home() {
       const data = await res.json() as ConnectResult;
       setActiveSession(data);
       setMessages([{ role: "assistant", content: `Resuming **${s.name}**. What do you want to understand about it?` }]);
+      setCoachRecs([]);
       setStage("chat");
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : "Failed to load session");
     }
+  }
+
+  async function requestCoaching(axes: Array<{ label: string; key: string; score: number; explanation: string }>) {
+    if (!activeSession || coachLoading) return;
+    setCoachLoading(true);
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: apiHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ session_id: activeSession.session_id, axes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Coach failed");
+      setCoachRecs(data.recommendations || []);
+    } catch (err) {
+      console.error("Coach error:", err);
+    } finally { setCoachLoading(false); }
   }
 
   const CSS = `
@@ -406,6 +429,16 @@ export default function Home() {
             {activeSession.semantic_profile && (
               <SemanticProfile profile={activeSession.semantic_profile} />
             )}
+            {activeSession.semantic_profile && <hr className="sb-hr" />}
+            {activeSession.semantic_profile && (
+              <CoherenceScore
+                profile={activeSession.semantic_profile}
+                absences={activeSession.profile?.absences}
+                onCoachRequest={requestCoaching}
+              />
+            )}
+            {(coachLoading || coachRecs.length > 0) && <hr className="sb-hr" />}
+            <CoachPanel recommendations={coachRecs} loading={coachLoading} />
             {activeSession.semantic_profile && <hr className="sb-hr" />}
             {activeSession.profile?.absences?.length > 0 && (
               <InferenceMap

@@ -14,7 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
-const CERATA_API_URL = Deno.env.get("CERATA_API_URL") || "";
+const CERATA_API_URL = Deno.env.get("CERATA_API_URL") || "https://cerata-nematocysts.fly.dev";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -350,8 +350,8 @@ Deno.serve(async (req) => {
         const cerataRes = await fetch(`${CERATA_API_URL}/cx`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: message, tau, lambda: 1.0 }),
-          signal: AbortSignal.timeout(5000),
+          body: JSON.stringify({ text: message, tau, lam: 1.0 }),
+          signal: AbortSignal.timeout(15000),
         });
         if (cerataRes.ok) {
           const cerataData = await cerataRes.json();
@@ -413,6 +413,29 @@ Deno.serve(async (req) => {
     // 5. Build system prompt with C(x) injection
     const systemPrompt = buildSystemPrompt(cxReading, msgCount);
 
+    // 5b. Retrieve Fibonacci memories for context
+    let memoryContext = "";
+    try {
+      const { data: memories } = await supabase
+        .from("fibonacci_memories")
+        .select("content, tier, rho, coherence")
+        .eq("session_id", session_id)
+        .eq("is_alive", true)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (memories && memories.length > 0) {
+        memoryContext = "\n\nYour memory of this conversation:\n" +
+          memories.map((m: { content: string; tier: string }) =>
+            `[${m.tier}] ${m.content.substring(0, 200)}`
+          ).join("\n");
+      }
+    } catch (memErr) {
+      console.error("[roseglass-chat] memory retrieval failed:", memErr);
+    }
+
+    const fullSystemPrompt = systemPrompt + memoryContext;
+
     // 6. Build message array for Anthropic
     const apiMessages = [
       ...(history || []).map((m: { role: string; content: string }) => ({
@@ -435,7 +458,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 4096,
-          system: systemPrompt,
+          system: fullSystemPrompt,
           messages: apiMessages,
           tools: [
             {
@@ -459,6 +482,43 @@ Deno.serve(async (req) => {
       .insert({ session_id, role: "assistant", content: assistantContent });
 
     if (asstErr) console.error("[roseglass-chat] assistant msg insert failed:", asstErr);
+
+    // 8b. Store Fibonacci memory
+    try {
+      const rho = cxReading.zones.rho?.A || 0;
+      const fibPos = rho > 0.5 ? 8 : rho > 0.25 ? 5 : 3;
+      const tierName = fibPos === 8 ? "pattern" : fibPos === 5 ? "context" : "event";
+      const bucket = (v: number) => v < 0.05 ? "zero" : v < 0.25 ? "low" : v < 0.5 ? "moderate" : v < 0.75 ? "elevated" : "high";
+
+      // Get api_key_id from session
+      const { data: sessData } = await supabase
+        .from("db_sessions")
+        .select("api_key_id")
+        .eq("id", session_id)
+        .single();
+
+      await supabase.from("fibonacci_memories").insert({
+        session_id,
+        api_key_id: sessData?.api_key_id || null,
+        fib_position: fibPos,
+        tier: tierName,
+        position_name: tierName,
+        content: `${message.substring(0, 300)} | Response: ${assistantContent.substring(0, 300)}`,
+        psi: cxReading.zones.psi?.A || 0,
+        rho,
+        q: cxReading.zones.q?.A || 0,
+        f: cxReading.zones.f?.A || 0,
+        coherence: cxReading.Cx,
+        psi_bucket: bucket(cxReading.zones.psi?.A || 0),
+        rho_bucket: bucket(rho),
+        q_bucket: bucket(cxReading.zones.q?.A || 0),
+        f_bucket: bucket(cxReading.zones.f?.A || 0),
+        context_domain: "roseglass_app",
+        tags: ["web", tierName],
+      });
+    } catch (memErr) {
+      console.error("[roseglass-chat] fibonacci memory insert failed:", memErr);
+    }
 
     // 9. Return response + topology
     return new Response(
