@@ -320,6 +320,7 @@ export default function Home() {
       .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid rgba(180,150,90,0.08)}
       .home-lede{font-size:1.8rem}
       .preset-grid{grid-template-columns:1fr}
+      .how-row{grid-template-columns:1fr}
       .custom-row{flex-direction:column}
       .field-input,.field-input.wide{width:100%}
       .rg-header{padding:0.8rem 1rem}
