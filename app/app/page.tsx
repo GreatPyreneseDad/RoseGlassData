@@ -1,10 +1,10 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import InferenceMap from "./components/InferenceMap";
-import SemanticProfile from "./components/SemanticProfile";
-import CoherenceScore from "./components/CoherenceScore";
-import CoachPanel, { type Recommendation } from "./components/CoachPanel";
-import SidebarCollapse from "./components/SidebarCollapse";
+import InferenceMap from "../components/InferenceMap";
+import SemanticProfile from "../components/SemanticProfile";
+import CoherenceScore from "../components/CoherenceScore";
+import CoachPanel, { type Recommendation } from "../components/CoachPanel";
+import SidebarCollapse from "../components/SidebarCollapse";
 
 function getApiKey(): string {
   if (typeof window === "undefined") return "";
