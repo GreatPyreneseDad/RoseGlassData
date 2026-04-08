@@ -16,32 +16,32 @@ interface Props {
 const CSS = `
   .cp-wrap{padding:0.8rem 0}
   .cp-title{font-family:'JetBrains Mono',monospace;font-size:0.55rem;
-    letter-spacing:0.25em;color:#252a35;text-transform:uppercase;
+    letter-spacing:0.25em;color:#d0c8b8;text-transform:uppercase;
     margin-bottom:0.7rem}
   .cp-list{display:flex;flex-direction:column;gap:0.6rem}
   .cp-rec{padding:0.65rem 0.75rem;border-left:2px solid;
-    background:rgba(255,255,255,0.01)}
-  .cp-rec.critical{border-color:#b06060;
+    background:rgba(0,0,0,0.02)}
+  .cp-rec.critical{border-color:#a04040;
     background:rgba(180,60,60,0.04)}
-  .cp-rec.important{border-color:#c8a96e;
-    background:rgba(200,169,110,0.03)}
-  .cp-rec.suggested{border-color:rgba(180,150,90,0.2);
-    background:rgba(255,255,255,0.01)}
-  .cp-rec.info{border-color:rgba(180,150,90,0.1)}
+  .cp-rec.important{border-color:#8b6f3a;
+    background:rgba(139,111,58,0.03)}
+  .cp-rec.suggested{border-color:#d0c8b8;
+    background:rgba(0,0,0,0.02)}
+  .cp-rec.info{border-color:#e8e2d8}
   .cp-priority{font-family:'JetBrains Mono',monospace;font-size:0.5rem;
     letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.25rem}
-  .cp-priority.critical{color:#b06060}
-  .cp-priority.important{color:#c8a96e}
-  .cp-priority.suggested{color:#5a6070}
-  .cp-priority.info{color:#3a3f50}
+  .cp-priority.critical{color:#a04040}
+  .cp-priority.important{color:#8b6f3a}
+  .cp-priority.suggested{color:#6b5d3e}
+  .cp-priority.info{color:#8a8070}
   .cp-axis{font-family:'JetBrains Mono',monospace;font-size:0.5rem;
-    color:#3a3f50;letter-spacing:0.1em;margin-bottom:0.3rem}
+    color:#8a8070;letter-spacing:0.1em;margin-bottom:0.3rem}
   .cp-action{font-family:'Cormorant Garamond',serif;font-size:0.88rem;
-    color:#d0c898;line-height:1.45;margin-bottom:0.2rem}
+    color:#4a4030;line-height:1.45;margin-bottom:0.2rem}
   .cp-rationale{font-family:'Georgia',serif;font-size:0.72rem;
     color:#4a5060;line-height:1.5}
   .cp-loading{font-family:'JetBrains Mono',monospace;font-size:0.6rem;
-    color:#3a3f50;letter-spacing:0.15em;animation:cpBlink 1.4s infinite}
+    color:#8a8070;letter-spacing:0.15em;animation:cpBlink 1.4s infinite}
   @keyframes cpBlink{0%,100%{opacity:1}50%{opacity:0.25}}
 `;
 

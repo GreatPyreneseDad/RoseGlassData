@@ -83,17 +83,17 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
   const allNodes = [sourceNode, ...decisionNodes, ...foreclosedNodes];
 
   function nodeColor(type: Node["type"], isHovered: boolean) {
-    if (type === "source")     return isHovered ? "#c8a96e" : "#9a7a40";
-    if (type === "decision")   return isHovered ? "#c8a96e" : "#5a6478";
-    if (type === "foreclosed") return isHovered ? "#c06060" : "#4a3838";
-    return "#5a6478";
+    if (type === "source")     return isHovered ? "#8b6f3a" : "#8b6f3a";
+    if (type === "decision")   return isHovered ? "#8b6f3a" : "#8a8070";
+    if (type === "foreclosed") return isHovered ? "#c06060" : "#f0e8e0";
+    return "#8a8070";
   }
 
   function nodeBorder(type: Node["type"]) {
-    if (type === "source")     return "#c8a96e";
-    if (type === "decision")   return "rgba(180,150,90,0.3)";
-    if (type === "foreclosed") return "rgba(180,60,60,0.3)";
-    return "rgba(180,150,90,0.2)";
+    if (type === "source")     return "#8b6f3a";
+    if (type === "decision")   return "#d0c8b8";
+    if (type === "foreclosed") return "#e0c0c0";
+    return "#d0c8b8";
   }
 
   function getEdgePath(from: Node, to: Node): string {
@@ -106,8 +106,8 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
 
   return (
     <div style={{
-      background: "rgba(7,9,15,0.97)",
-      border: "1px solid rgba(180,150,90,0.1)",
+      background: "rgba(250,248,244,0.97)",
+      border: "1px solid #e8e2d8",
       marginTop: "1.5rem",
       padding: "1.2rem",
     }}>
@@ -115,7 +115,7 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
         fontFamily: "'JetBrains Mono',monospace",
         fontSize: "0.55rem",
         letterSpacing: "0.3em",
-        color: "#3a3f50",
+        color: "#8a8070",
         textTransform: "uppercase",
         marginBottom: "0.8rem",
       }}>
@@ -124,9 +124,9 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
 
       <div style={{ display: "flex", gap: "1.5rem", marginBottom: "0.7rem", alignItems: "center" }}>
         {[
-          { color: "#9a7a40", border: "#c8a96e", label: "Collection event" },
-          { color: "#5a6478", border: "rgba(180,150,90,0.3)", label: "Collection decision" },
-          { color: "#4a3838", border: "rgba(180,60,60,0.3)", label: "Foreclosed inference" },
+          { color: "#8b6f3a", border: "#8b6f3a", label: "Collection event" },
+          { color: "#8a8070", border: "#d0c8b8", label: "Collection decision" },
+          { color: "#f0e8e0", border: "#e0c0c0", label: "Foreclosed inference" },
         ].map(l => (
           <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <div style={{
@@ -137,7 +137,7 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
             <span style={{
               fontFamily: "'JetBrains Mono',monospace",
               fontSize: "0.52rem",
-              color: "#2a2f3a",
+              color: "#b0a890",
               letterSpacing: "0.1em",
             }}>{l.label}</span>
           </div>
@@ -154,10 +154,10 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
         >
           <defs>
             <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L6,3 z" fill="rgba(180,150,90,0.25)" />
+              <path d="M0,0 L0,6 L6,3 z" fill="#d0c8b8" />
             </marker>
             <marker id="arrow-fc" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L6,3 z" fill="rgba(180,60,60,0.25)" />
+              <path d="M0,0 L0,6 L6,3 z" fill="#e0c0c0" />
             </marker>
           </defs>
 
@@ -178,8 +178,8 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
                   d={getEdgePath({ ...fromNode, x: fromX, y: fromY }, { ...toNode, x: toX, y: toY })}
                   fill="none"
                   stroke={isFc
-                    ? (isActive ? "rgba(180,60,60,0.5)" : "rgba(180,60,60,0.15)")
-                    : (isActive ? "rgba(200,169,110,0.4)" : "rgba(200,169,110,0.1)")
+                    ? (isActive ? "rgba(160,64,64,0.5)" : "#e8d0d0")
+                    : (isActive ? "rgba(139,111,58,0.5)" : "#e0d8c8")
                   }
                   strokeWidth={isActive ? 1.5 : 1}
                   markerEnd={isFc ? "url(#arrow-fc)" : "url(#arrow)"}
@@ -190,7 +190,7 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
                     x={(fromX + toX) / 2}
                     y={(fromY + toY) / 2 - 5}
                     textAnchor="middle"
-                    fill={isActive ? "rgba(180,60,60,0.6)" : "rgba(180,60,60,0.2)"}
+                    fill={isActive ? "rgba(180,60,60,0.6)" : "rgba(160,64,64,0.2)"}
                     fontSize="8"
                     fontFamily="'JetBrains Mono',monospace"
                     letterSpacing="1"
@@ -241,8 +241,8 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
                       fontFamily: "'Cormorant Garamond',serif",
                       fontSize: "11px",
                       color: node.type === "foreclosed"
-                        ? (isH ? "#e8a0a0" : "#907070")
-                        : (isH ? "#e8d8a8" : "#9a9880"),
+                        ? (isH ? "#a04040" : "#c09080")
+                        : (isH ? "#4a4030" : "#6b5d3e"),
                       lineHeight: 1.35,
                       overflow: "hidden",
                       display: "-webkit-box",
@@ -264,15 +264,15 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
                 x={tooltip.x - 120}
                 y={tooltip.y - 28}
                 width={240} height={26}
-                fill="rgba(7,9,15,0.95)"
-                stroke="rgba(180,150,90,0.2)"
+                fill="rgba(250,248,244,0.97)"
+                stroke="#d0c8b8"
                 rx={1}
               />
               <text
                 x={tooltip.x}
                 y={tooltip.y - 12}
                 textAnchor="middle"
-                fill="#5a6070"
+                fill="#6b5d3e"
                 fontSize="9"
                 fontFamily="'JetBrains Mono',monospace"
                 letterSpacing="0.5"
@@ -293,7 +293,7 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
               x={col.x}
               y={18}
               textAnchor="middle"
-              fill="#252a35"
+              fill="#d0c8b8"
               fontSize="8"
               fontFamily="'JetBrains Mono',monospace"
               letterSpacing="1.5"
@@ -309,9 +309,9 @@ export default function InferenceMap({ absences, lens_summary, datasetName }: Pr
         marginTop: "0.8rem",
         fontFamily: "'Georgia',serif",
         fontSize: "0.75rem",
-        color: "#3a4050",
+        color: "#8a8070",
         lineHeight: 1.7,
-        borderTop: "1px solid rgba(180,150,90,0.07)",
+        borderTop: "1px solid #e8e2d8",
         paddingTop: "0.7rem",
       }}>
         {lens_summary}

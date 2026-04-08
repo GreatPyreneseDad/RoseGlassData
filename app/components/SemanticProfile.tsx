@@ -26,22 +26,22 @@ interface SemanticProfileProps {
 
 const CSS = `
   .sp-container{padding:1rem 0;font-size:0.75rem}
-  .sp-title{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.7rem;display:block;margin-top:0.9rem;margin-bottom:0.5rem}
+  .sp-title{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#d0c8b8;text-transform:uppercase;margin-bottom:0.7rem;display:block;margin-top:0.9rem;margin-bottom:0.5rem}
   .sp-title:first-child{margin-top:0}
-  .sp-grain{font-family:'Cormorant Garamond',serif;font-size:0.85rem;color:#9a9880;line-height:1.5;margin-bottom:1rem}
-  .sp-class{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#5a6070;letter-spacing:0.08em;margin-bottom:1rem;padding:0.5rem 0.7rem;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.06);display:inline-block}
-  .sp-scope{font-family:'Georgia',serif;font-size:0.78rem;color:#5a6070;line-height:1.5;margin-bottom:1rem}
-  .sp-limit{font-family:'Georgia',serif;font-size:0.75rem;color:#3a3f50;line-height:1.6;margin-bottom:0.4rem;padding-left:0.8rem;border-left:1px solid rgba(200,169,110,0.15)}
+  .sp-grain{font-family:'Cormorant Garamond',serif;font-size:0.85rem;color:#6b5d3e;line-height:1.5;margin-bottom:1rem}
+  .sp-class{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#6b5d3e;letter-spacing:0.08em;margin-bottom:1rem;padding:0.5rem 0.7rem;background:rgba(0,0,0,0.02);border:1px solid #ede8df;display:inline-block}
+  .sp-scope{font-family:'Georgia',serif;font-size:0.78rem;color:#6b5d3e;line-height:1.5;margin-bottom:1rem}
+  .sp-limit{font-family:'Georgia',serif;font-size:0.75rem;color:#8a8070;line-height:1.6;margin-bottom:0.4rem;padding-left:0.8rem;border-left:1px solid #d0c8b8}
   .sp-col-table{width:100%;border-collapse:collapse;margin-top:0.5rem}
-  .sp-col-row{border-bottom:1px solid rgba(180,150,90,0.05);font-size:0.68rem}
-  .sp-col-name{padding:0.4rem 0.5rem;font-family:'JetBrains Mono',monospace;color:#9a9880;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;word-break:break-word}
-  .sp-col-type{padding:0.4rem 0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:#5a6070;letter-spacing:0.05em}
+  .sp-col-row{border-bottom:1px solid #ede8df;font-size:0.68rem}
+  .sp-col-name{padding:0.4rem 0.5rem;font-family:'JetBrains Mono',monospace;color:#6b5d3e;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;word-break:break-word}
+  .sp-col-type{padding:0.4rem 0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:#6b5d3e;letter-spacing:0.05em}
   .sp-col-risk{padding:0.4rem 0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem}
-  .sp-col-risk.none{color:#5a6070}
+  .sp-col-risk.none{color:#6b5d3e}
   .sp-col-risk.low{color:#7a9070}
-  .sp-col-risk.moderate{color:#c8a96e;font-weight:500}
-  .sp-col-risk.high{color:#b06060;font-weight:500}
-  .sp-col-lineage{padding:0.4rem 0.5rem;font-family:'Georgia',serif;font-size:0.68rem;color:#3a3f50;max-width:200px}
+  .sp-col-risk.moderate{color:#8b6f3a;font-weight:500}
+  .sp-col-risk.high{color:#a04040;font-weight:500}
+  .sp-col-lineage{padding:0.4rem 0.5rem;font-family:'Georgia',serif;font-size:0.68rem;color:#8a8070;max-width:200px}
 `;
 
 export default function SemanticProfile({ profile }: SemanticProfileProps) {
@@ -63,7 +63,7 @@ export default function SemanticProfile({ profile }: SemanticProfileProps) {
       <span className="sp-title">Dataset Profile</span>
 
       <div className="sp-grain">
-        <strong style={{ color: "#d0c898" }}>Grain:</strong> {profile.grain}
+        <strong style={{ color: "#4a4030" }}>Grain:</strong> {profile.grain}
       </div>
 
       <div className="sp-class">
@@ -84,7 +84,7 @@ export default function SemanticProfile({ profile }: SemanticProfileProps) {
 
       {proxyRiskCols.length > 0 && (
         <>
-          <span className="sp-title" style={{ marginTop: "0.8rem", color: "#b06060" }}>⚠ Proxy Risk (Moderate/High)</span>
+          <span className="sp-title" style={{ marginTop: "0.8rem", color: "#a04040" }}>⚠ Proxy Risk (Moderate/High)</span>
           <table className="sp-col-table">
             <tbody>
               {proxyRiskCols.map(col => (
@@ -103,8 +103,8 @@ export default function SemanticProfile({ profile }: SemanticProfileProps) {
         <>
           <span className="sp-title" style={{ marginTop: "0.8rem" }}>Composite Fields</span>
           {compositeCols.map(col => (
-            <div key={col.column} className="sp-limit" style={{ borderLeftColor: "rgba(200,169,110,0.25)" }}>
-              <strong style={{ color: "#9a9880" }}>{col.column}:</strong> {col.lineage_note}
+            <div key={col.column} className="sp-limit" style={{ borderLeftColor: "#d0c8b8" }}>
+              <strong style={{ color: "#6b5d3e" }}>{col.column}:</strong> {col.lineage_note}
             </div>
           ))}
         </>
