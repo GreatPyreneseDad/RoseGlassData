@@ -144,8 +144,19 @@ export default function Home() {
     if (!uploadFile) return;
     setUploading(true); setConnectError(null); setStage("connecting");
     try {
+      // Client-side sampling: read CSV, keep header + first 500 rows
+      // This means even a 500MB file only sends ~1MB to the server
+      const rawText = await uploadFile.text();
+      const lines = rawText.split("\n");
+      const maxRows = 501; // header + 500 data rows
+      const sampled = lines.slice(0, maxRows).join("\n");
+      const sampledBlob = new Blob([sampled], { type: "text/csv" });
+      const sampledFile = new File([sampledBlob], uploadFile.name, { type: "text/csv" });
+
       const form = new FormData();
-      form.append("file", uploadFile);
+      form.append("file", sampledFile);
+      // Send original row count so profiler knows the true size
+      form.append("original_row_count", String(Math.max(0, lines.filter(l => l.trim()).length - 1)));
       const res = await fetch("/api/upload", { method: "POST", headers: apiHeaders(), body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");

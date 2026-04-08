@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    const originalRowCount = parseInt(formData.get("original_row_count") as string || "0", 10);
     if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
 
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) return NextResponse.json({ error: "No data rows detected" }, { status: 400 });
 
     const profile = profileCSV(file.name, headers, rows);
+    // Use original row count if provided (client sampled the CSV)
+    const trueRowCount = originalRowCount > 0 ? originalRowCount : profile.row_count;
     const db = getDB();
 
     const sessionRes = await db.query(
@@ -110,7 +113,7 @@ export async function POST(request: NextRequest) {
       name: profile.name,
       variable_count: profile.variable_count,
       concept_count: profile.concept_count,
-      row_count: profile.row_count,
+      row_count: trueRowCount,
       moe_coverage: 0,
       geographies: [],
       tokens_remaining: auth.tokens_remaining,
