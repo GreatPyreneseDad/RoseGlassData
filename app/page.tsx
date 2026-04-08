@@ -230,191 +230,133 @@ export default function Home() {
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#07090f}
-    .rg-header{border-bottom:1px solid rgba(180,150,90,0.12);padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(7,9,15,0.96);backdrop-filter:blur(12px)}
-    .rg-mark{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;color:#c8a96e}
-    .rg-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.3em;color:#2a2f3a;text-transform:uppercase}
-    .home{max-width:880px;margin:0 auto;padding:4rem 2rem}
-    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#e8dfc8;margin-bottom:1.5rem;letter-spacing:0.02em;animation:fadeUp 0.6s ease both}
-    .home-lede em{color:#c8a96e;font-style:italic}
-    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif;animation:fadeUp 0.6s ease 0.1s both}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    .how-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(180,150,90,0.06);border:1px solid rgba(180,150,90,0.06);margin-bottom:3rem;animation:fadeUp 0.6s ease 0.2s both}
-    .how-card{background:#07090f;padding:1.3rem;text-align:left}
-    .how-num{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:#3a3f50;letter-spacing:0.2em;margin-bottom:0.5rem}
-    .how-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.3rem}
-    .how-desc{font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:#3a3f50;letter-spacing:0.06em;line-height:1.7}
-    .tab-row{display:flex;gap:0;margin-bottom:2rem;border-bottom:1px solid rgba(180,150,90,0.1)}
-    .tab{padding:0.6rem 1.4rem;background:none;border:none;border-bottom:2px solid transparent;color:#3a3f50;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;transition:all 0.15s;margin-bottom:-1px}
-    .tab:hover{color:#7a7f8a}
-    .tab.active{color:#c8a96e;border-bottom-color:#c8a96e}
-    .preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1px;background:rgba(180,150,90,0.08);border:1px solid rgba(180,150,90,0.08);margin-bottom:2.5rem}
-    .preset-card{background:#07090f;padding:1.5rem;cursor:pointer;transition:background 0.2s;border:none;text-align:left;color:inherit;width:100%}
-    .preset-card:hover{background:rgba(200,169,110,0.04)}
-    .preset-card:disabled{opacity:0.35;cursor:not-allowed}
-    .pc-label{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:#d4c8a0;margin-bottom:0.4rem}
-    .pc-desc{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#3a3f50;letter-spacing:0.08em;line-height:1.6}
-    .pc-cta{font-size:0.75rem;color:#c8a96e;opacity:0;transition:opacity 0.2s;margin-top:0.6rem;display:block;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em}
-    .preset-card:hover .pc-cta{opacity:1}
-    .custom-row{display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:3rem}
-    .field-label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#2a2f3a;text-transform:uppercase;display:block;margin-bottom:0.35rem}
-    .field-input{background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;outline:none;width:260px;transition:border-color 0.2s}
-    .field-input:focus{border-color:rgba(200,169,110,0.35)}
+    body{background:#faf8f4}
+    .rg-header{border-bottom:1px solid #e8e2d8;padding:1.1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;background:rgba(250,248,244,0.97);backdrop-filter:blur(12px)}
+    .rg-mark{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:400;letter-spacing:0.25em;text-transform:uppercase;color:#6b5d3e}
+    .rg-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#b0a890;text-transform:uppercase}
+    .home{max-width:720px;margin:0 auto;padding:6rem 2rem 4rem}
+    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:300;line-height:1.25;color:#2a2520;margin-bottom:1.5rem;letter-spacing:0.01em;animation:fadeUp 0.5s ease both}
+    .home-lede em{color:#8b6f3a;font-style:italic}
+    .home-sub{font-size:0.95rem;line-height:1.9;color:#7a7060;max-width:520px;margin-bottom:3.5rem;font-family:'Georgia',serif;animation:fadeUp 0.5s ease 0.08s both}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .home-actions{display:flex;flex-direction:column;gap:2.5rem;animation:fadeUp 0.5s ease 0.15s both}
+    .demo-btn{padding:1rem 2rem;background:#2a2520;border:none;color:#faf8f4;cursor:pointer;font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:400;letter-spacing:0.05em;transition:all 0.2s;text-align:left;display:flex;align-items:center;justify-content:space-between}
+    .demo-btn:hover{background:#3d352a}
+    .demo-btn:disabled{opacity:0.4;cursor:not-allowed}
+    .demo-btn span{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#b0a890;letter-spacing:0.15em}
+    .or-divider{display:flex;align-items:center;gap:1rem}
+    .or-divider hr{flex:1;border:none;border-top:1px solid #e0d8c8}
+    .or-divider span{font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:#b0a890;letter-spacing:0.2em;text-transform:uppercase}
+    .upload-zone{border:1px dashed #d0c8b8;padding:2rem;text-align:center;cursor:pointer;transition:all 0.2s;background:transparent}
+    .upload-zone:hover{border-color:#8b6f3a;background:rgba(139,111,58,0.02)}
+    .upload-zone.has-file{border-color:#8b6f3a;border-style:solid;background:rgba(139,111,58,0.03)}
+    .uz-label{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#6b5d3e;margin-bottom:0.25rem}
+    .uz-sub{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#b0a890;letter-spacing:0.08em}
+    .uz-filename{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:#8b6f3a;margin-top:0.4rem}
+    .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #8b6f3a;color:#8b6f3a;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
+    .rg-btn:hover:not(:disabled){background:rgba(139,111,58,0.06)}
+    .rg-btn:disabled{border-color:#d0c8b8;color:#d0c8b8;cursor:not-allowed}
+    .upload-row{display:flex;gap:0.75rem;align-items:center;margin-top:0.75rem}
+    .field-label{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.2em;color:#b0a890;text-transform:uppercase;display:block;margin-bottom:0.35rem}
+    .field-input{background:#fff;border:1px solid #e0d8c8;color:#2a2520;padding:0.65rem 0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;outline:none;width:260px;transition:border-color 0.2s}
+    .field-input:focus{border-color:#8b6f3a}
     .field-input.short{width:100px}
-    .field-input.wide{width:480px}
-    .rg-btn{padding:0.65rem 1.5rem;background:transparent;border:1px solid #c8a96e;color:#c8a96e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
-    .rg-btn:hover:not(:disabled){background:rgba(200,169,110,0.07)}
-    .rg-btn:disabled{border-color:#252a35;color:#252a35;cursor:not-allowed}
-    .upload-zone{border:1px dashed rgba(180,150,90,0.2);padding:2.5rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem;background:rgba(255,255,255,0.01)}
-    .upload-zone:hover{border-color:rgba(200,169,110,0.4);background:rgba(200,169,110,0.02)}
-    .upload-zone.has-file{border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.03)}
-    .uz-icon{font-size:1.8rem;margin-bottom:0.6rem;opacity:0.4}
-    .uz-label{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#9a9880;margin-bottom:0.3rem}
-    .uz-sub{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#3a3f50;letter-spacing:0.1em}
-    .uz-filename{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#c8a96e;margin-top:0.5rem}
-    .pg-form{display:flex;flex-direction:column;gap:1rem;max-width:560px;margin-bottom:2rem}
-    .pg-note{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em;line-height:1.7;margin-top:-0.3rem}
-    .prior-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.9rem}
-    .prior-list{display:flex;flex-direction:column;gap:1px}
-    .prior-item{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.06);cursor:pointer;transition:background 0.15s}
-    .prior-item:hover{background:rgba(200,169,110,0.03)}
-    .prior-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:#9a9880}
-    .prior-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.08em}
-    .connector-badge{font-size:0.5rem;padding:0.15rem 0.4rem;border:1px solid rgba(180,150,90,0.15);color:#3a4050;font-family:'JetBrains Mono',monospace;letter-spacing:0.15em;text-transform:uppercase;margin-right:0.5rem}
+    .field-input.wide{width:100%}
+    .how-row{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:4rem;padding-top:3rem;border-top:1px solid #e8e2d8}
+    .how-card{text-align:left}
+    .how-num{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:#b0a890;letter-spacing:0.2em;margin-bottom:0.4rem}
+    .how-title{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#2a2520;margin-bottom:0.3rem}
+    .how-desc{font-family:'Georgia',serif;font-size:0.82rem;color:#8a8070;line-height:1.65}
+    .prior-section{margin-top:3rem;padding-top:2rem;border-top:1px solid #e8e2d8}
+    .prior-title{font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.25em;color:#b0a890;text-transform:uppercase;margin-bottom:0.9rem}
+    .prior-list{display:flex;flex-direction:column;gap:2px}
+    .prior-item{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.8rem;background:#fff;border:1px solid #ede8df;cursor:pointer;transition:all 0.15s}
+    .prior-item:hover{border-color:#8b6f3a}
+    .prior-name{font-family:'Cormorant Garamond',serif;font-size:0.92rem;color:#4a4030}
+    .prior-meta{font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:#b0a890;letter-spacing:0.08em}
+    .connector-badge{font-size:0.48rem;padding:0.12rem 0.35rem;border:1px solid #e0d8c8;color:#8a8070;font-family:'JetBrains Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;margin-right:0.4rem}
     .connecting{max-width:600px;margin:0 auto;padding:7rem 2rem;text-align:center}
-    .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#c8a96e;margin-bottom:1rem;font-weight:300}
-    .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#3a3f50;letter-spacing:0.2em;animation:blink 1.4s infinite}
+    .conn-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#6b5d3e;margin-bottom:1rem;font-weight:300}
+    .conn-sub{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:#b0a890;letter-spacing:0.2em;animation:blink 1.4s infinite}
     .conn-steps{margin-top:2rem;display:flex;flex-direction:column;gap:0.5rem;text-align:left;max-width:340px;margin-left:auto;margin-right:auto}
-    .conn-step{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#252a35;letter-spacing:0.1em;padding:0.35rem 0;border-bottom:1px solid rgba(180,150,90,0.04)}
+    .conn-step{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#b0a890;letter-spacing:0.1em;padding:0.35rem 0;border-bottom:1px solid #ede8df}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
+    .err{background:rgba(180,60,60,0.04);border:1px solid rgba(180,60,60,0.15);padding:0.7rem 1rem;margin-bottom:1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:#a04040}
     .chat-wrap{display:flex;height:calc(100vh - 54px)}
-    .sidebar{width:280px;flex-shrink:0;border-right:1px solid rgba(180,150,90,0.08);padding:1.5rem 1.25rem;overflow-y:auto;background:#07090f;scrollbar-width:thin;scrollbar-color:rgba(180,150,90,0.1) transparent}
+    .sidebar{width:280px;flex-shrink:0;border-right:1px solid #e8e2d8;padding:1.5rem 1.25rem;overflow-y:auto;background:#f5f2ed;scrollbar-width:thin;scrollbar-color:rgba(139,111,58,0.15) transparent}
     .sidebar::-webkit-scrollbar{width:4px}
     .sidebar::-webkit-scrollbar-track{background:transparent}
-    .sidebar::-webkit-scrollbar-thumb{background:rgba(180,150,90,0.15);border-radius:2px}
-    .sb-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.4rem}
-    .sb-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#2a2f3a;letter-spacing:0.08em;line-height:1.9}
-    .sb-hr{border:none;border-top:1px solid rgba(180,150,90,0.07);margin:1.2rem 0}
-    .sb-section{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.7rem}
-    .starter{display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:3px;background:rgba(255,255,255,0.01);border:1px solid rgba(180,150,90,0.05);color:#5a6070;cursor:pointer;font-family:'Georgia',serif;font-size:0.78rem;line-height:1.4;transition:all 0.15s}
-    .starter:hover{border-color:rgba(200,169,110,0.15);color:#9a9880}
-    .back{margin-top:1.2rem;padding:0.4rem 0;background:none;border:none;color:#252a35;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:color 0.15s}
-    .back:hover{color:#c8a96e}
-    .chat-main{flex:1;display:flex;flex-direction:column;min-width:0}
+    .sidebar::-webkit-scrollbar-thumb{background:rgba(139,111,58,0.2);border-radius:2px}
+    .sb-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#4a4030;margin-bottom:0.4rem}
+    .sb-meta{font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#8a8070;letter-spacing:0.08em;line-height:1.9}
+    .sb-hr{border:none;border-top:1px solid #e0d8c8;margin:1.2rem 0}
+    .starter{display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:3px;background:#fff;border:1px solid #ede8df;color:#6b5d3e;cursor:pointer;font-family:'Georgia',serif;font-size:0.78rem;line-height:1.4;transition:all 0.15s}
+    .starter:hover{border-color:#8b6f3a;color:#4a4030}
+    .back{margin-top:1.2rem;padding:0.4rem 0;background:none;border:none;color:#b0a890;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:color 0.15s}
+    .back:hover{color:#8b6f3a}
+    .chat-main{flex:1;display:flex;flex-direction:column;min-width:0;background:#faf8f4}
     .messages{flex:1;overflow-y:auto;padding:2rem;display:flex;flex-direction:column;gap:1.5rem}
     .msg{max-width:740px;line-height:1.75}
-    .msg-user{align-self:flex-end;background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.1);padding:0.7rem 1.2rem;font-size:0.95rem;color:#c4c8d4;font-family:'Georgia',serif}
-    .msg-assistant{align-self:flex-start;font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#a8acb8}
-    .msg-assistant strong{color:#d0c898;font-weight:500}
-    .msg-assistant em{color:#c8a96e;font-style:italic}
-    .input-row{border-top:1px solid rgba(180,150,90,0.08);padding:1.2rem 2rem;display:flex;gap:0.75rem;align-items:flex-end;background:rgba(7,9,15,0.97)}
-    .chat-input{flex:1;background:rgba(255,255,255,0.02);border:1px solid rgba(180,150,90,0.12);color:#c4c8d4;padding:0.7rem 1rem;font-family:'Georgia',serif;font-size:0.93rem;outline:none;resize:none;min-height:46px;max-height:160px;line-height:1.5;transition:border-color 0.2s}
-    .chat-input:focus{border-color:rgba(200,169,110,0.3)}
-    .chat-input::placeholder{color:#252a35;font-style:italic}
-    .err{background:rgba(180,60,60,0.06);border:1px solid rgba(180,60,60,0.18);padding:0.7rem 1rem;margin-bottom:1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:#b06060}
-    .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c8a96e;margin:0 2px;animation:dot 1.2s infinite}
+    .msg-user{align-self:flex-end;background:#fff;border:1px solid #e0d8c8;padding:0.7rem 1.2rem;font-size:0.95rem;color:#2a2520;font-family:'Georgia',serif}
+    .msg-assistant{align-self:flex-start;font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:#4a4030}
+    .msg-assistant strong{color:#2a2520;font-weight:500}
+    .msg-assistant em{color:#8b6f3a;font-style:italic}
+    .input-row{border-top:1px solid #e8e2d8;padding:1.2rem 2rem;display:flex;gap:0.75rem;align-items:flex-end;background:#faf8f4}
+    .chat-input{flex:1;background:#fff;border:1px solid #e0d8c8;color:#2a2520;padding:0.7rem 1rem;font-family:'Georgia',serif;font-size:0.93rem;outline:none;resize:none;min-height:46px;max-height:160px;line-height:1.5;transition:border-color 0.2s}
+    .chat-input:focus{border-color:#8b6f3a}
+    .chat-input::placeholder{color:#c0b8a8;font-style:italic}
+    .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#8b6f3a;margin:0 2px;animation:dot 1.2s infinite}
     .dots span:nth-child(2){animation-delay:0.2s}.dots span:nth-child(3){animation-delay:0.4s}
     @keyframes dot{0%,80%,100%{transform:scale(0.6);opacity:0.3}40%{transform:scale(1);opacity:1}}
     @media(max-width:768px){
       .chat-wrap{flex-direction:column}
-      .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid rgba(180,150,90,0.08)}
+      .sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid #e8e2d8}
       .home-lede{font-size:1.8rem}
-      .preset-grid{grid-template-columns:1fr}
-      .how-row{grid-template-columns:1fr}
-      .custom-row{flex-direction:column}
-      .field-input,.field-input.wide{width:100%}
+      .how-row{grid-template-columns:1fr;gap:1.5rem}
+      .home{padding:3rem 1.5rem 3rem}
       .rg-header{padding:0.8rem 1rem}
     }
   `;
 
-  const connectingLabel = homeTab === "upload"
+  const connectingLabel = uploadFile && stage === "connecting"
     ? "Reading your CSV" : homeTab === "postgres"
     ? "Introspecting database schema" : "Reading dataset structure";
 
-  const connectingSub = homeTab === "upload"
+  const connectingSub = uploadFile && stage === "connecting"
     ? "parsing columns · inferring types · detecting absences"
     : homeTab === "postgres"
     ? "connecting · reading schema · profiling tables"
     : "fetching variable manifest · profiling concepts · detecting absences";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07090f", color: "#c4c8d4" }}>
+    <div style={{ minHeight: "100vh", background: "#faf8f4", color: "#2a2520" }}>
       <style>{CSS}</style>
       <header className="rg-header">
-        <div className="rg-mark" style={{display:"flex",alignItems:"center",gap:"12px"}}><img src="/logo.png" alt="Rose Glass Data" style={{height:"48px",width:"48px",borderRadius:"8px"}} />Rose Glass Data</div>
+        <div className="rg-mark" style={{display:"flex",alignItems:"center",gap:"12px"}}><img src="/logo.png" alt="Rose Glass Data" style={{height:"40px",width:"40px",borderRadius:"6px"}} />Rose Glass Data</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
           <div className="rg-tag">Translation · Not Judgment</div>
-          <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#3a3f50" : "#c8a96e", textDecoration: "none", border: hasKey ? "none" : "1px solid rgba(200,169,110,0.35)", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>
-            {hasKey ? "Account" : "Sign In · Register"}
+          <a href="/login" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.15em", color: hasKey ? "#8a8070" : "#8b6f3a", textDecoration: "none", border: hasKey ? "none" : "1px solid #8b6f3a", padding: hasKey ? "0" : "0.3rem 0.8rem", transition: "color 0.15s" }}>
+            {hasKey ? "Account" : "Sign In"}
           </a>
         </div>
       </header>
 
       {stage === "home" && (
         <div className="home">
-          <h1 className="home-lede">What does this database <em>believe</em><br />about the world it measures?</h1>
-          <p className="home-sub">Connect a public dataset or upload your own. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts.</p>
-          {!hasKey && (
-            <div style={{ background: "rgba(200,169,110,0.04)", border: "1px solid rgba(200,169,110,0.2)", padding: "1.5rem 2rem", marginBottom: "2.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
-              <div>
-                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.1rem", color: "#d4c8a0", marginBottom: "0.3rem" }}>Create a free account to get started</div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#3a3f50", letterSpacing: "0.1em", lineHeight: 1.7 }}>10,000 free tokens · no credit card required · upgrade anytime</div>
-              </div>
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <a href="/login?tab=signup" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid #c8a96e", color: "#c8a96e", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Create account</a>
-                <a href="/login" style={{ padding: "0.6rem 1.4rem", background: "transparent", border: "1px solid rgba(180,150,90,0.2)", color: "#5a6070", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", textDecoration: "none", whiteSpace: "nowrap" }}>Sign in</a>
-              </div>
-            </div>
-          )}
+          <h1 className="home-lede">What does this data <em>believe</em><br />about the world it measures?</h1>
+          <p className="home-sub">Upload a dataset or try the demo. Rose Glass reads its structure — what it tracks, what it avoids, and what worldview is baked into how it counts.</p>
+
           {connectError && <div className="err">{connectError}</div>}
 
-          <div className="how-row">
-            <div className="how-card">
-              <div className="how-num">01</div>
-              <div className="how-title">Connect</div>
-              <div className="how-desc">Point at a Census dataset, upload a CSV, or connect a PostgreSQL database</div>
-            </div>
-            <div className="how-card">
-              <div className="how-num">02</div>
-              <div className="how-title">Profile</div>
-              <div className="how-desc">Seven AI agents classify every column — type, lineage, proxy risk, null semantics, dependencies</div>
-            </div>
-            <div className="how-card">
-              <div className="how-num">03</div>
-              <div className="how-title">Interrogate</div>
-              <div className="how-desc">Ask what the data believes, what it hides, and where its structure fails the people it measures</div>
-            </div>
-          </div>
+          <div className="home-actions">
+            <button className="demo-btn" onClick={() => connectDataset("acs/acs5", 2023, "ACS 5-Year 2023")} disabled={connecting}>
+              Try the demo — ACS 5-Year 2023
+              <span>20,000+ variables · social, economic, housing</span>
+            </button>
 
-          <div className="tab-row">
-            {(["census","upload","postgres"] as const).map(t => (
-              <button key={t} className={`tab ${homeTab === t ? "active" : ""}`} onClick={() => setHomeTab(t)}>
-                {t === "census" ? "Public Data" : t === "upload" ? "Upload CSV" : "PostgreSQL"}
-              </button>
-            ))}
-          </div>
+            <div className="or-divider"><hr /><span>or</span><hr /></div>
 
-          {homeTab === "census" && (<>
-            <div className="preset-grid">
-              {PRESETS.map(ds => (
-                <button key={ds.dataset_id} className="preset-card" onClick={() => connectDataset(ds.dataset_id, ds.vintage, ds.label)} disabled={connecting}>
-                  <div className="pc-label">{ds.label}</div>
-                  <div className="pc-desc">{ds.desc}</div>
-                  <span className="pc-cta">Connect →</span>
-                </button>
-              ))}
-            </div>
-            <div className="custom-row">
-              <div><label className="field-label">Custom dataset ID</label>
-                <input className="field-input" value={customDataset} onChange={e => setCustomDataset(e.target.value)} placeholder="e.g. acs/acs5" /></div>
-              <div><label className="field-label">Vintage</label>
-                <input className="field-input short" value={customVintage} onChange={e => setCustomVintage(e.target.value)} placeholder="2023" /></div>
-              <button className="rg-btn" onClick={() => connectDataset(customDataset, parseInt(customVintage), `${customDataset} ${customVintage}`)} disabled={connecting || !customDataset.trim()}>Connect</button>
-            </div>
-          </>)}
-
-          {homeTab === "upload" && (
-            <div style={{ maxWidth: 560, marginBottom: "3rem" }}>
+            <div>
               <div className={`upload-zone ${uploadFile ? "has-file" : ""} ${dragOver ? "has-file" : ""}`}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -424,43 +366,41 @@ export default function Home() {
                   const f = e.dataTransfer.files?.[0];
                   if (f && f.name.endsWith(".csv")) setUploadFile(f);
                 }}>
-                <div className="uz-icon">⬆</div>
-                <div className="uz-label">{uploadFile ? uploadFile.name : "Drop a CSV or click to browse"}</div>
-                <div className="uz-sub">{uploadFile ? `${(uploadFile.size / 1024).toFixed(0)} KB` : "CSV files up to 50MB"}</div>
-                {uploadFile && <div className="uz-filename">Ready to profile</div>}
+                <div className="uz-label">{uploadFile ? uploadFile.name : "Drop a CSV here, or click to browse"}</div>
+                <div className="uz-sub">{uploadFile ? `${(uploadFile.size / 1024).toFixed(0)} KB · ready to profile` : "CSV files up to 50MB"}</div>
               </div>
               <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }}
                 onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
-              <button className="rg-btn" onClick={uploadCSV} disabled={!uploadFile || uploading}>
-                {uploading ? "Profiling…" : "Profile this dataset →"}
-              </button>
-              <p style={{ marginTop: "1rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", color: "#252a35", lineHeight: 1.7 }}>
-                Rose Glass will read your column structure, infer what domains are present, detect what is absent, and open a conversation about what the dataset believes about the world it measures.
-              </p>
+              {uploadFile && (
+                <div className="upload-row">
+                  <button className="rg-btn" onClick={uploadCSV} disabled={uploading}>
+                    {uploading ? "Profiling…" : "Profile this dataset →"}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
-          {homeTab === "postgres" && (
-            <div className="pg-form">
-              <div>
-                <label className="field-label">Connection string</label>
-                <input className="field-input wide" type="password" value={dbString}
-                  onChange={e => setDbString(e.target.value)}
-                  placeholder="postgresql://user:password@host:5432/dbname" />
-                <div className="pg-note" style={{ marginTop: "0.4rem" }}>Connection used in-flight only. Never stored. Public schema introspected.</div>
-              </div>
-              <div>
-                <label className="field-label">Dataset name (optional)</label>
-                <input className="field-input" value={dbName} onChange={e => setDbName(e.target.value)} placeholder="e.g. Recovery App Database" />
-              </div>
-              <button className="rg-btn" onClick={connectPostgres} disabled={connecting || !dbString.trim()}>
-                {connecting ? "Connecting…" : "Connect →"}
-              </button>
+          <div className="how-row">
+            <div className="how-card">
+              <div className="how-num">01</div>
+              <div className="how-title">Connect</div>
+              <div className="how-desc">Upload a CSV or connect a public dataset. We read the schema, not the rows.</div>
             </div>
-          )}
+            <div className="how-card">
+              <div className="how-num">02</div>
+              <div className="how-title">Profile</div>
+              <div className="how-desc">Seven AI agents classify every column — type, lineage, proxy risk, null semantics.</div>
+            </div>
+            <div className="how-card">
+              <div className="how-num">03</div>
+              <div className="how-title">Interrogate</div>
+              <div className="how-desc">Ask what the data believes, what it hides, and where its structure fails.</div>
+            </div>
+          </div>
 
           {sessions.length > 0 && (
-            <div>
+            <div className="prior-section">
               <div className="prior-title">Prior sessions</div>
               <div className="prior-list">
                 {sessions.map(s => (
@@ -483,17 +423,12 @@ export default function Home() {
           <div className="conn-title">{connectingLabel}</div>
           <div className="conn-sub">{connectingSub}</div>
           <div className="conn-steps">
-            {homeTab === "upload" ? (<>
+            {uploadFile ? (<>
               <div className="conn-step">↳ parsing column headers and sample values</div>
               <div className="conn-step">↳ inferring concept domains and data types</div>
               <div className="conn-step">↳ running 6 classification agents in parallel</div>
               <div className="conn-step">↳ synthesizing dataset-level profile</div>
               <div className="conn-step">↳ detecting structural absences</div>
-            </>) : homeTab === "postgres" ? (<>
-              <div className="conn-step">↳ connecting to database</div>
-              <div className="conn-step">↳ reading public schema</div>
-              <div className="conn-step">↳ inferring concept domains</div>
-              <div className="conn-step">↳ detecting structural gaps</div>
             </>) : (<>
               <div className="conn-step">↳ fetching variable manifest from Census API</div>
               <div className="conn-step">↳ profiling concept domains</div>

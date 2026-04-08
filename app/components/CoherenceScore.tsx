@@ -176,22 +176,22 @@ function RadarPolygon({ axes, size = 200 }: { axes: CoherenceAxis[]; size?: numb
 
   // Color based on overall score
   const avg = axes.reduce((s, a) => s + a.score, 0) / n;
-  const fillColor = avg > 0.7 ? "rgba(120,160,100,0.15)"
-    : avg > 0.45 ? "rgba(200,169,110,0.15)"
-    : "rgba(180,80,80,0.15)";
-  const strokeColor = avg > 0.7 ? "rgba(120,160,100,0.6)"
-    : avg > 0.45 ? "rgba(200,169,110,0.6)"
-    : "rgba(180,80,80,0.6)";
+  const fillColor = avg > 0.7 ? "rgba(90,138,64,0.12)"
+    : avg > 0.45 ? "rgba(139,111,58,0.1)"
+    : "rgba(160,64,64,0.1)";
+  const strokeColor = avg > 0.7 ? "rgba(90,138,64,0.7)"
+    : avg > 0.45 ? "rgba(139,111,58,0.6)"
+    : "rgba(160,64,64,0.6)";
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", margin: "0 auto" }}>
       {/* Grid rings */}
       {ringPaths.map((d, i) => (
-        <path key={`ring-${i}`} d={d} fill="none" stroke="rgba(180,150,90,0.06)" strokeWidth={0.5} />
+        <path key={`ring-${i}`} d={d} fill="none" stroke="#e0d8c8" strokeWidth={0.5} />
       ))}
       {/* Axis lines */}
       {axisLines.map((l, i) => (
-        <line key={`axis-${i}`} {...l} stroke="rgba(180,150,90,0.08)" strokeWidth={0.5} />
+        <line key={`axis-${i}`} {...l} stroke="#e0d8c8" strokeWidth={0.5} />
       ))}
       {/* Data polygon */}
       <path d={dataPath} fill={fillColor} stroke={strokeColor} strokeWidth={1.5}
@@ -205,7 +205,7 @@ function RadarPolygon({ axes, size = 200 }: { axes: CoherenceAxis[]; size?: numb
       {labelPoints.map((lp, i) => (
         <text key={`lbl-${i}`} x={lp.x} y={lp.y}
           textAnchor="middle" dominantBaseline="central"
-          fill={lp.score < 0.4 ? "rgba(180,80,80,0.7)" : "rgba(180,150,90,0.45)"}
+          fill={lp.score < 0.4 ? "rgba(160,64,64,0.7)" : "#8a8070"}
           fontSize="7.5" fontFamily="'JetBrains Mono',monospace" letterSpacing="0.5">
           {lp.label}
         </text>
@@ -218,29 +218,29 @@ function RadarPolygon({ axes, size = 200 }: { axes: CoherenceAxis[]; size?: numb
 
 const CSS = `
   .cs-wrap{padding:0.8rem 0;font-size:0.75rem}
-  .cs-title{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#252a35;text-transform:uppercase;margin-bottom:0.7rem}
+  .cs-title{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.25em;color:#8a8070;text-transform:uppercase;margin-bottom:0.7rem}
   .cs-overall{display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.9rem}
   .cs-number{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;line-height:1}
-  .cs-number.good{color:#8aaa70}
-  .cs-number.mid{color:#c8a96e}
-  .cs-number.low{color:#b06060}
-  .cs-label{font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:#3a3f50;letter-spacing:0.15em}
+  .cs-number.good{color:#5a8a40}
+  .cs-number.mid{color:#8b6f3a}
+  .cs-number.low{color:#a04040}
+  .cs-label{font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:#8a8070;letter-spacing:0.15em}
   .cs-axis-list{margin-top:0.8rem;display:flex;flex-direction:column;gap:0.5rem}
-  .cs-axis{padding:0.5rem 0;border-bottom:1px solid rgba(180,150,90,0.04)}
+  .cs-axis{padding:0.5rem 0;border-bottom:1px solid #e8e2d8}
   .cs-axis-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem}
   .cs-axis-name{font-family:'JetBrains Mono',monospace;font-size:0.6rem;letter-spacing:0.1em}
-  .cs-axis-name.good{color:#8aaa70}
-  .cs-axis-name.mid{color:#9a9880}
-  .cs-axis-name.low{color:#b06060}
-  .cs-axis-score{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#5a6070}
-  .cs-axis-bar{height:2px;background:rgba(255,255,255,0.03);margin-bottom:0.3rem;position:relative;overflow:hidden}
+  .cs-axis-name.good{color:#5a8a40}
+  .cs-axis-name.mid{color:#6b5d3e}
+  .cs-axis-name.low{color:#a04040}
+  .cs-axis-score{font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:#8a8070}
+  .cs-axis-bar{height:2px;background:#e8e2d8;margin-bottom:0.3rem;position:relative;overflow:hidden}
   .cs-axis-fill{height:100%;position:absolute;left:0;top:0;transition:width 0.5s ease}
-  .cs-axis-fill.good{background:#8aaa70}
-  .cs-axis-fill.mid{background:#c8a96e}
-  .cs-axis-fill.low{background:#b06060}
-  .cs-axis-note{font-family:'Georgia',serif;font-size:0.72rem;color:#3a4050;line-height:1.5}
-  .cs-coach-btn{margin-top:1rem;width:100%;padding:0.6rem;background:transparent;border:1px solid rgba(180,150,90,0.15);color:#5a6070;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:all 0.2s}
-  .cs-coach-btn:hover{border-color:rgba(200,169,110,0.35);color:#c8a96e}
+  .cs-axis-fill.good{background:#5a8a40}
+  .cs-axis-fill.mid{background:#8b6f3a}
+  .cs-axis-fill.low{background:#a04040}
+  .cs-axis-note{font-family:'Georgia',serif;font-size:0.72rem;color:#7a7060;line-height:1.5}
+  .cs-coach-btn{margin-top:1rem;width:100%;padding:0.6rem;background:transparent;border:1px solid #d0c8b8;color:#6b5d3e;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;transition:all 0.2s}
+  .cs-coach-btn:hover{border-color:#8b6f3a;color:#8b6f3a}
 `;
 
 function scoreClass(s: number): string {
