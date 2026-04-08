@@ -5,7 +5,7 @@ import { buildCoherenceGraph, ColumnNode } from "@/lib/coherence-graph";
 import { checkAuth, withTokenHeaders } from "@/lib/auth";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
   const lines: string[] = [];
@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
 
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "csv") return NextResponse.json({ error: "Only CSV files supported currently" }, { status: 400 });
-    if (file.size > 4 * 1024 * 1024)
-      return NextResponse.json({ error: "File too large. Max 4MB." }, { status: 400 });
+    if (file.size > 50 * 1024 * 1024)
+      return NextResponse.json({ error: "File too large. Max 50MB." }, { status: 400 });
 
     const text = await file.text();
     const { headers, rows } = parseCSV(text);
