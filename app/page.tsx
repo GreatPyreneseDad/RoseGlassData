@@ -105,6 +105,7 @@ export default function Home() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [homeTab, setHomeTab] = useState<"census"|"upload"|"postgres">("census");
+  const [dragOver, setDragOver] = useState(false);
   const [coachRecs, setCoachRecs] = useState<Recommendation[]>([]);
   const [coachLoading, setCoachLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -234,9 +235,15 @@ export default function Home() {
     .rg-mark{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;color:#c8a96e}
     .rg-tag{font-family:'JetBrains Mono',monospace;font-size:0.55rem;letter-spacing:0.3em;color:#2a2f3a;text-transform:uppercase}
     .home{max-width:880px;margin:0 auto;padding:4rem 2rem}
-    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#e8dfc8;margin-bottom:1.5rem;letter-spacing:0.02em}
+    .home-lede{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;line-height:1.3;color:#e8dfc8;margin-bottom:1.5rem;letter-spacing:0.02em;animation:fadeUp 0.6s ease both}
     .home-lede em{color:#c8a96e;font-style:italic}
-    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif}
+    .home-sub{font-size:0.95rem;line-height:1.85;color:#5a6070;max-width:560px;margin-bottom:2.5rem;font-family:'Georgia',serif;animation:fadeUp 0.6s ease 0.1s both}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .how-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(180,150,90,0.06);border:1px solid rgba(180,150,90,0.06);margin-bottom:3rem;animation:fadeUp 0.6s ease 0.2s both}
+    .how-card{background:#07090f;padding:1.3rem;text-align:left}
+    .how-num{font-family:'JetBrains Mono',monospace;font-size:0.5rem;color:#3a3f50;letter-spacing:0.2em;margin-bottom:0.5rem}
+    .how-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#d0c898;margin-bottom:0.3rem}
+    .how-desc{font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:#3a3f50;letter-spacing:0.06em;line-height:1.7}
     .tab-row{display:flex;gap:0;margin-bottom:2rem;border-bottom:1px solid rgba(180,150,90,0.1)}
     .tab{padding:0.6rem 1.4rem;background:none;border:none;border-bottom:2px solid transparent;color:#3a3f50;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;transition:all 0.15s;margin-bottom:-1px}
     .tab:hover{color:#7a7f8a}
@@ -360,6 +367,24 @@ export default function Home() {
           )}
           {connectError && <div className="err">{connectError}</div>}
 
+          <div className="how-row">
+            <div className="how-card">
+              <div className="how-num">01</div>
+              <div className="how-title">Connect</div>
+              <div className="how-desc">Point at a Census dataset, upload a CSV, or connect a PostgreSQL database</div>
+            </div>
+            <div className="how-card">
+              <div className="how-num">02</div>
+              <div className="how-title">Profile</div>
+              <div className="how-desc">Seven AI agents classify every column — type, lineage, proxy risk, null semantics, dependencies</div>
+            </div>
+            <div className="how-card">
+              <div className="how-num">03</div>
+              <div className="how-title">Interrogate</div>
+              <div className="how-desc">Ask what the data believes, what it hides, and where its structure fails the people it measures</div>
+            </div>
+          </div>
+
           <div className="tab-row">
             {(["census","upload","postgres"] as const).map(t => (
               <button key={t} className={`tab ${homeTab === t ? "active" : ""}`} onClick={() => setHomeTab(t)}>
@@ -389,7 +414,15 @@ export default function Home() {
 
           {homeTab === "upload" && (
             <div style={{ maxWidth: 560, marginBottom: "3rem" }}>
-              <div className="upload-zone has-file" onClick={() => fileInputRef.current?.click()}>
+              <div className={`upload-zone ${uploadFile ? "has-file" : ""} ${dragOver ? "has-file" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault(); setDragOver(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && f.name.endsWith(".csv")) setUploadFile(f);
+                }}>
                 <div className="uz-icon">⬆</div>
                 <div className="uz-label">{uploadFile ? uploadFile.name : "Drop a CSV or click to browse"}</div>
                 <div className="uz-sub">{uploadFile ? `${(uploadFile.size / 1024).toFixed(0)} KB` : "CSV files up to 50MB"}</div>
