@@ -84,8 +84,14 @@ const CONTESTED: Array<[RegExp, string]> = [
   [/preg/i, "pregnancy status"],
 ];
 
-function isIntToken(v: string): boolean {
-  return /^-?\d+$/.test(v.trim());
+// Parse a token to its integer CODE when it represents a whole number — accepting
+// both "88" and the "88.0" form that SAS/XPT->CSV exports (like this BRFSS file)
+// emit. Returns null for blanks, text, or genuinely fractional values.
+function asIntCode(v: string): number | null {
+  const t = v.trim();
+  if (!/^-?\d+(?:\.0+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }
 
 // Codes we recognise as conventional survey reserved values.
@@ -141,7 +147,9 @@ export function analyzeStructure(headers: string[], rows: string[][]): DatasetSt
       /(^_?wt\d*$|weight$|^pweight$|finalwt|_llcpwt|_ststr|_psu|rake)/i.test(name);
 
     // ---- typed null detection (numeric columns only) ----
-    const ints = nonEmpty.filter(isIntToken).map((v) => parseInt(v, 10));
+    const ints = nonEmpty
+      .map(asIntCode)
+      .filter((n): n is number => n !== null);
     const nullFindings: NullFinding[] = [];
     let naiveVsValid: NaiveVsValid | null = null;
 

@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       filename,
       profile.row_count
     );
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 40_000));
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 48_000));
     semantic = await Promise.race([translatePromise, timeout]);
   } catch {
     semantic = null;
