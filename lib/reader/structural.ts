@@ -163,7 +163,9 @@ export function analyzeStructure(headers: string[], rows: string[][]): DatasetSt
     if (!isWeight && ints.length >= 20) {
       const present = new Set(ints.filter((n) => SENTINEL_CANDIDATES.has(n)));
       const core = ints.filter((n) => !present.has(n));
-      const coreMax = core.length ? Math.max(...core) : -Infinity;
+      // reduce, not Math.max(...core): spreading a multi-thousand-element array can
+      // overflow the call stack.
+      const coreMax = core.length ? core.reduce((m, n) => (n > m ? n : m), -Infinity) : -Infinity;
       const detected: number[] = [];
       for (const c of present) {
         // A code is a sentinel only when it sits detached ABOVE the real range.

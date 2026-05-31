@@ -122,10 +122,13 @@ export async function POST(request: NextRequest) {
   // 2. deterministic structural pre-layer (typed nulls, raw->derived, weights, naive-vs-valid)
   const structure = analyzeStructure(headers, rows);
 
-  // 3. Claude semantic pass (best-effort; null on failure or missing key -> Veritas silence)
+  // 3. Claude semantic pass — best-effort and TIME-BOUNDED. The deterministic read
+  //    above is the headline; the model pass only enriches it. If the model is slow,
+  //    missing its key, or errors, we proceed with semantic=null (Veritas silence)
+  //    rather than let this public function hang until a gateway timeout (504).
   let semantic = null;
   try {
-    semantic = await translateColumns(
+    const translatePromise = translateColumns(
       profile.columns.map((c) => ({
         name: c.name,
         concept: c.concept,
@@ -137,6 +140,8 @@ export async function POST(request: NextRequest) {
       filename,
       profile.row_count
     );
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 40_000));
+    semantic = await Promise.race([translatePromise, timeout]);
   } catch {
     semantic = null;
   }
