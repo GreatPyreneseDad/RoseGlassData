@@ -7,7 +7,9 @@
 // perceived about the dataset) and leaves Hand 2 (what it means for your research) a
 // deliberately empty, open hand. Where the read cannot verify, it stays silent.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+interface ChatMessage { role: "user" | "assistant"; content: string }
 
 interface NullKind { code: string; kind: string; label: string; n: number }
 interface NaiveVsValid {
@@ -73,10 +75,24 @@ export default function EE26Page() {
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // ---- chat about the read (ephemeral, in-session only) ----
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const chatEnd = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat, chatBusy]);
+
   const doRead = useCallback(async (csvText: string, filename: string) => {
     setStage("reading");
     setError("");
     setRead(null);
+    setChat([]);
+    setChatInput("");
+    setChatError("");
     setActiveName(filename);
     try {
       const res = await fetch("/api/read", {
@@ -125,6 +141,36 @@ export default function EE26Page() {
     },
     [doRead]
   );
+
+  const sendChat = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || chatBusy || !read) return;
+    const next: ChatMessage[] = [...chat, { role: "user", content: text }];
+    setChat(next);
+    setChatInput("");
+    setChatBusy(true);
+    setChatError("");
+    try {
+      const res = await fetch("/api/ee26-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ read, messages: next }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Chat could not complete.");
+      setChat((c) => [...c, { role: "assistant", content: data.reply }]);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "Chat could not complete.");
+    } finally {
+      setChatBusy(false);
+    }
+  }, [chatInput, chatBusy, read, chat]);
+
+  const SUGGESTIONS = [
+    "Which columns would mislead a naive average?",
+    "What is absent here that I might assume is present?",
+    "Where could a field act as a proxy for something else?",
+  ];
 
   return (
     <div className="ee">
@@ -359,6 +405,72 @@ export default function EE26Page() {
               question, your study, your next step — that is yours to hold. Rose Glass does not fill it.
             </p>
           </div>
+
+          {/* ---- ask about the read (ephemeral chat) ---- */}
+          <div className="chat" aria-label="Ask about what was perceived">
+            <div className="hand-label">
+              <span className="hand-num">Ask</span>
+              <span>Questions about what was perceived</span>
+            </div>
+            <p className="chat-intro">
+              Ask about the columns, the codes, the absences, the dependencies above. It answers only from
+              this read, says when it can’t tell, and leaves the meaning to you.
+            </p>
+
+            {chat.length === 0 && (
+              <div className="chat-suggest">
+                {SUGGESTIONS.map((s) => (
+                  <button key={s} className="suggest" onClick={() => setChatInput(s)} disabled={chatBusy}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {chat.length > 0 && (
+              <div className="chat-log">
+                {chat.map((m, i) => (
+                  <div key={i} className={`bubble ${m.role}`}>
+                    {m.content}
+                  </div>
+                ))}
+                {chatBusy && (
+                  <div className="bubble assistant pending" aria-live="polite">
+                    <span className="dots"><span /><span /><span /></span>
+                  </div>
+                )}
+                <div ref={chatEnd} />
+              </div>
+            )}
+
+            {chatError && <p className="err" role="alert">{chatError}</p>}
+
+            <div className="chat-input-row">
+              <textarea
+                className="chat-input"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChat();
+                  }
+                }}
+                placeholder="Ask about this read…"
+                rows={1}
+                aria-label="Ask a question about this read"
+              />
+              <button
+                className="chat-send"
+                onClick={sendChat}
+                disabled={chatBusy || !chatInput.trim()}
+                aria-label="Send question"
+              >
+                {chatBusy ? "…" : "Ask"}
+              </button>
+            </div>
+            <p className="chat-note">Conversation stays in this session — nothing is saved.</p>
+          </div>
         </section>
       )}
 
@@ -460,6 +572,29 @@ const CSS = `
 .ee .proxy-note{color:#7a7060}
 .ee .hand2{margin:2rem 0 .5rem;background:repeating-linear-gradient(135deg,#faf8f4,#faf8f4 10px,#f6f2e9 10px,#f6f2e9 20px);border:1px dashed #d8cdb5;border-radius:13px;padding:1.4rem 1.5rem}
 .ee .hand2-body{font-size:.95rem;color:#7a7060;font-style:italic;max-width:560px}
+.ee .chat{margin:2rem 0 .5rem}
+.ee .chat-intro{font-size:.9rem;color:#7a7060;max-width:560px;margin-bottom:1rem}
+.ee .chat-suggest{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+.ee .suggest{text-align:left;font-family:inherit;font-size:.82rem;color:#6b5d3e;background:#fff;border:1px solid #e8e2d8;border-radius:999px;padding:.45rem .9rem;cursor:pointer;transition:border-color .15s,background .15s}
+.ee .suggest:hover:not(:disabled),.ee .suggest:focus-visible{border-color:#8b6f3a;background:#fffdf8;outline:none}
+.ee .suggest:disabled{opacity:.5;cursor:default}
+.ee .chat-log{display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem}
+.ee .bubble{max-width:88%;padding:.75rem 1rem;border-radius:13px;font-size:.92rem;line-height:1.65;white-space:pre-wrap;word-wrap:break-word}
+.ee .bubble.user{align-self:flex-end;background:#f0ebdf;color:#2a2520;border-bottom-right-radius:4px}
+.ee .bubble.assistant{align-self:flex-start;background:#fff;border:1px solid #e8e2d8;color:#3a352c;border-bottom-left-radius:4px}
+.ee .bubble.pending{padding:.9rem 1rem}
+.ee .dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:#b0a890;margin:0 2px;animation:eedot 1.2s infinite}
+.ee .dots span:nth-child(2){animation-delay:.2s}
+.ee .dots span:nth-child(3){animation-delay:.4s}
+@keyframes eedot{0%,80%,100%{transform:scale(.6);opacity:.3}40%{transform:scale(1);opacity:1}}
+.ee .chat-input-row{display:flex;gap:.6rem;align-items:flex-end}
+.ee .chat-input{flex:1;font-family:Georgia,serif;font-size:.92rem;color:#2a2520;background:#fff;border:1px solid #e8e2d8;border-radius:10px;padding:.7rem .9rem;outline:none;resize:none;min-height:46px;max-height:160px;line-height:1.5;transition:border-color .15s}
+.ee .chat-input:focus{border-color:#8b6f3a}
+.ee .chat-input::placeholder{color:#b0a890;font-style:italic}
+.ee .chat-send{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#faf8f4;background:#2a2520;border:none;border-radius:10px;padding:0 1.3rem;height:46px;cursor:pointer;transition:background .15s}
+.ee .chat-send:hover:not(:disabled){background:#3d352a}
+.ee .chat-send:disabled{background:#d0c8b8;cursor:default}
+.ee .chat-note{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.06em;color:#b0a890;margin-top:.6rem}
 .ee .privacy{max-width:760px;margin:0 auto;padding:2.5rem 2rem 1rem;border-top:1px solid #e8e2d8}
 .ee .privacy h3{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:1.15rem;color:#2a2520;margin-bottom:.6rem}
 .ee .privacy p{font-size:.88rem;color:#7a7060;max-width:620px}
