@@ -182,9 +182,15 @@ export async function POST(request: NextRequest) {
       raw_or_derived: st.raw_or_derived,
       derived_from: st.derived_from,
       is_design_weight: st.is_design_weight,
+      // imputed-vs-reported: a verifiable schema fact (the variable's derivation),
+      // distinct from the generic proxy tag. Hand 1 may name it plainly (Veritas).
+      is_imputed: st.is_imputed,
+      imputed_note: st.imputed_note,
       null_kinds: nullKinds,
       null_note: clean(sem?.null_semantics),
       naive_vs_valid: st.naive_vs_valid,
+      // categorical code columns get a distribution, never a mean.
+      categorical_distribution: st.categorical_distribution,
       structural_absence: st.structural_absence,
       proxy_risk: proxy,
       // Veritas: nothing perceivable on this column -> say so, do not invent.
@@ -192,7 +198,9 @@ export async function POST(request: NextRequest) {
         !sem &&
         nullKinds.length === 0 &&
         !st.naive_vs_valid &&
+        !st.categorical_distribution &&
         !st.structural_absence &&
+        !st.is_imputed &&
         st.raw_or_derived === "raw" &&
         !st.is_design_weight &&
         !st.proxy_concept,

@@ -12,9 +12,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface ChatMessage { role: "user" | "assistant"; content: string }
 
 interface NullKind { code: string; kind: string; label: string; n: number }
-interface NaiveVsValid {
-  naive_mean: number; valid_mean: number; excluded_codes: string[];
-  n_valid: number; n_excluded: number;
+interface MeanReading {
+  naive_mean: number;
+  corrected_mean: number | null;
+  valid_domain: string | null;
+  zero_code: string | null;
+  zero_inclusive_mean: number | null;
+  excluded_codes: string[];
+  n_valid: number;
+  n_excluded: number;
+  domain_verified: boolean;
+  sample_caveat: string;
+}
+interface CategoricalDistribution {
+  total: number;
+  codes: Array<{ code: string; n: number }>;
+  truncated: number;
 }
 interface ReadColumn {
   name: string;
@@ -23,9 +36,12 @@ interface ReadColumn {
   raw_or_derived: "raw" | "derived" | null;
   derived_from: string[] | null;
   is_design_weight: boolean;
+  is_imputed: boolean;
+  imputed_note: string | null;
   null_kinds: NullKind[];
   null_note: string | null;
-  naive_vs_valid: NaiveVsValid | null;
+  naive_vs_valid: MeanReading | null;
+  categorical_distribution: CategoricalDistribution | null;
   structural_absence: string | null;
   proxy_risk: { level: string; note: string | null } | null;
   silent: boolean;
@@ -334,6 +350,7 @@ export default function EE26Page() {
                   <code className="col-name">{c.name}</code>
                   <span className="col-flags">
                     {c.is_design_weight && <span className="flag wt">design weight</span>}
+                    {c.is_imputed && <span className="flag imp">imputed</span>}
                     {c.raw_or_derived === "derived" && (
                       <span className="flag dv">
                         derived{c.derived_from ? ` from ${c.derived_from.join(", ")}` : ""}
@@ -367,14 +384,58 @@ export default function EE26Page() {
                       </div>
                     )}
 
-                    {c.naive_vs_valid && (
-                      <p className="naive">
-                        Naive mean <strong>{c.naive_vs_valid.naive_mean}</strong> counts the reserved
-                        codes ({c.naive_vs_valid.excluded_codes.join(", ")}) as real numbers. Over only
-                        the {c.naive_vs_valid.n_valid.toLocaleString()} valid values it is{" "}
-                        <strong>{c.naive_vs_valid.valid_mean}</strong>. The absence was wearing a large
-                        number.
-                      </p>
+                    {c.is_imputed && c.imputed_note && (
+                      <p className="imputed">{c.imputed_note}</p>
+                    )}
+
+                    {c.naive_vs_valid && c.naive_vs_valid.domain_verified && (
+                      <div className="naive">
+                        <p>
+                          Naive mean <strong>{c.naive_vs_valid.naive_mean}</strong>{" "}
+                          {c.naive_vs_valid.excluded_codes.length > 0 ? (
+                            <>counts the reserved codes ({c.naive_vs_valid.excluded_codes.join(", ")}) and any out-of-range value as real numbers.</>
+                          ) : (
+                            <>counts out-of-range values as real numbers.</>
+                          )}{" "}
+                          Over the {c.naive_vs_valid.valid_domain} valid range:{" "}
+                          <strong>{c.naive_vs_valid.corrected_mean}</strong>{" "}
+                          (n&nbsp;=&nbsp;{c.naive_vs_valid.n_valid.toLocaleString()}).
+                          {c.naive_vs_valid.zero_code && c.naive_vs_valid.zero_inclusive_mean != null && (
+                            <> Counting code {c.naive_vs_valid.zero_code} as 0 days:{" "}
+                              <strong>{c.naive_vs_valid.zero_inclusive_mean}</strong>.</>
+                          )}
+                        </p>
+                        <p className="mean-caveat">{c.naive_vs_valid.sample_caveat}</p>
+                      </div>
+                    )}
+
+                    {c.naive_vs_valid && !c.naive_vs_valid.domain_verified && (
+                      <div className="naive unverified">
+                        <p>
+                          Naive mean <strong>{c.naive_vs_valid.naive_mean}</strong>. Suspected reserved
+                          codes ({c.naive_vs_valid.excluded_codes.join(", ")}) sit above the value range,
+                          so this mean is likely inflated — but without a codebook the valid domain is
+                          unverified, so no corrected figure is asserted.
+                        </p>
+                        <p className="mean-caveat">{c.naive_vs_valid.sample_caveat}</p>
+                      </div>
+                    )}
+
+                    {c.categorical_distribution && (
+                      <div className="dist">
+                        <span className="lbl">code distribution</span>
+                        <span className="dist-codes">
+                          {c.categorical_distribution.codes.map((d) => (
+                            <span className="distk" key={d.code}>
+                              <code>{d.code}</code> <span className="nn">{d.n.toLocaleString()}</span>
+                            </span>
+                          ))}
+                          {c.categorical_distribution.truncated > 0 && (
+                            <span className="distk more">+{c.categorical_distribution.truncated} more</span>
+                          )}
+                        </span>
+                        <span className="dist-note">categorical codes — a mean would not be a quantity</span>
+                      </div>
                     )}
 
                     {c.null_note && <p className="subtle">{c.null_note}</p>}
@@ -566,6 +627,17 @@ const CSS = `
 .ee .nullk .nn{color:#b0a890;font-family:'JetBrains Mono',monospace;font-size:.6rem}
 .ee .naive{font-size:.88rem;color:#5a4a2e;background:#fbf3e2;border:1px solid #e8d6ad;border-radius:9px;padding:.7rem .85rem;line-height:1.65}
 .ee .naive strong{color:#7a5a1e}
+.ee .naive.unverified{background:#f7f3ea;border-color:#d8cdb5;color:#6b6253}
+.ee .mean-caveat{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.04em;color:#a8946a;margin-top:.45rem;line-height:1.5}
+.ee .imputed{font-size:.86rem;color:#6a4a6a;background:#f6f0f6;border:1px solid #e3d3e6;border-radius:9px;padding:.7rem .85rem;line-height:1.6}
+.ee .flag.imp{color:#8a5a8a;background:#f3e8f4}
+.ee .dist{display:flex;flex-direction:column;gap:.4rem}
+.ee .dist-codes{display:flex;flex-wrap:wrap;gap:.4rem}
+.ee .distk{font-size:.76rem;color:#5a5246;background:#f4f1ea;border:1px solid #e6ddcb;border-radius:6px;padding:.18rem .5rem}
+.ee .distk code{font-size:.72rem;color:#6b5d3e}
+.ee .distk .nn{color:#a89a78;font-family:'JetBrains Mono',monospace;font-size:.62rem;margin-left:.2rem}
+.ee .distk.more{color:#a89a78;font-style:italic}
+.ee .dist-note{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.04em;color:#b0a890}
 .ee .subtle{font-size:.82rem;color:#7a7060}
 .ee .proxy{font-size:.84rem;color:#5a5246}
 .ee .proxy-lvl{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:#8b5b5b;background:#f6eded;border-radius:5px;padding:.2rem .45rem}

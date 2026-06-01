@@ -39,6 +39,23 @@ function rateLimited(ip: string): boolean {
 
 // ---- the read shape (mirrors /api/read output; read defensively) ----
 interface NullKind { code: string; kind: string; label: string; n: number }
+interface MeanReading {
+  naive_mean: number;
+  corrected_mean: number | null;
+  valid_domain: string | null;
+  zero_code: string | null;
+  zero_inclusive_mean: number | null;
+  excluded_codes: string[];
+  n_valid: number;
+  n_excluded: number;
+  domain_verified: boolean;
+  sample_caveat: string;
+}
+interface CategoricalDistribution {
+  total: number;
+  codes: Array<{ code: string; n: number }>;
+  truncated: number;
+}
 interface ReadColumn {
   name: string;
   semantic_type: string | null;
@@ -46,12 +63,12 @@ interface ReadColumn {
   raw_or_derived: "raw" | "derived" | null;
   derived_from: string[] | null;
   is_design_weight: boolean;
+  is_imputed?: boolean;
+  imputed_note?: string | null;
   null_kinds: NullKind[];
   null_note: string | null;
-  naive_vs_valid: {
-    naive_mean: number; valid_mean: number; excluded_codes: string[];
-    n_valid: number; n_excluded: number;
-  } | null;
+  naive_vs_valid: MeanReading | null;
+  categorical_distribution?: CategoricalDistribution | null;
   structural_absence: string | null;
   proxy_risk: { level: string; note: string | null } | null;
   silent: boolean;
@@ -110,6 +127,7 @@ function summarizeRead(read: ReadResult): string {
     if (c.semantic_type) parts.push(c.semantic_type.replace(/_/g, " "));
     if (c.collection_method) parts.push(c.collection_method.replace(/_/g, " "));
     if (c.is_design_weight) parts.push("design weight");
+    if (c.is_imputed && c.imputed_note) parts.push(c.imputed_note);
     if (c.raw_or_derived === "derived") {
       parts.push(c.derived_from ? `derived from ${c.derived_from.join(", ")}` : "derived");
     }
@@ -120,8 +138,24 @@ function summarizeRead(read: ReadResult): string {
     }
     if (c.naive_vs_valid) {
       const nv = c.naive_vs_valid;
+      if (nv.domain_verified && nv.corrected_mean != null) {
+        let s = `naive mean ${nv.naive_mean} counts reserved codes and out-of-range values as real; over the valid ${nv.valid_domain} range the mean is ${nv.corrected_mean} (n=${nv.n_valid})`;
+        if (nv.zero_code && nv.zero_inclusive_mean != null) {
+          s += `; counting code ${nv.zero_code} as 0 it is ${nv.zero_inclusive_mean}`;
+        }
+        s += ` [${nv.sample_caveat}]`;
+        parts.push(s);
+      } else {
+        parts.push(
+          `naive mean ${nv.naive_mean}; suspected reserved codes (${nv.excluded_codes.join(", ")}) sit above the range so it is likely inflated, but the valid domain is unverified (no codebook) so no corrected mean is asserted [${nv.sample_caveat}]`
+        );
+      }
+    }
+    if (c.categorical_distribution) {
+      const d = c.categorical_distribution;
+      const top = d.codes.map((x) => `${x.code}:${x.n}`).join(", ");
       parts.push(
-        `naive mean ${nv.naive_mean} counts the reserved codes (${nv.excluded_codes.join(", ")}) as real; over the ${nv.n_valid} valid values the mean is ${nv.valid_mean}`
+        `categorical (no mean — codes are not magnitudes); code frequencies: ${top}${d.truncated > 0 ? `, +${d.truncated} more` : ""}`
       );
     }
     if (c.null_note) parts.push(`null note: ${c.null_note}`);
